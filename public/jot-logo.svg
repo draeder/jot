@@ -1,0 +1,31 @@
+<svg viewBox="0 0 768 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Notebook/Journal outline -->
+  <rect x="96" y="242" width="328" height="256" rx="32" ry="32" 
+        fill="none" stroke="#1e3a8a" stroke-width="24"/>
+  
+  <!-- Spiral binding holes -->
+  <circle cx="104" cy="290" r="12" fill="#1e3a8a"/>
+  <circle cx="104" cy="330" r="12" fill="#1e3a8a"/>
+  <circle cx="104" cy="370" r="12" fill="#1e3a8a"/>
+  <circle cx="104" cy="410" r="12" fill="#1e3a8a"/>
+  
+  <!-- Large "J" inside notebook -->
+  <path d="M256 298 L256 420 Q256 450 226 450 Q196 450 196 420 L196 390"
+        fill="none" stroke="#1e3a8a" stroke-width="28" stroke-linecap="round"/>
+  
+  <!-- "Jot" text -->
+  <g fill="#1e3a8a" font-family="Arial Black, sans-serif" font-weight="900" font-size="120">
+    <!-- J -->
+    <path d="M428 298 L428 420 Q428 460 388 460 Q348 460 348 420 L348 390"
+          fill="none" stroke="#1e3a8a" stroke-width="20" stroke-linecap="round"/>
+    
+    <!-- o -->
+    <circle cx="528" cy="379" r="60" fill="none" stroke="#1e3a8a" stroke-width="20"/>
+    
+    <!-- t -->
+    <line x1="598" y1="319" x2="598" y2="439" stroke="#1e3a8a" stroke-width="20" stroke-linecap="round"/>
+    <line x1="578" y1="319" x2="618" y2="319" stroke="#1e3a8a" stroke-width="20" stroke-linecap="round"/>
+    <line x1="618" y1="419" x2="658" y2="419" stroke="#1e3a8a" stroke-width="20" stroke-linecap="round"/>
+    <line x1="638" y1="399" x2="638" y2="439" stroke="#1e3a8a" stroke-width="20" stroke-linecap="round"/>
+  </g>
+</svg>
