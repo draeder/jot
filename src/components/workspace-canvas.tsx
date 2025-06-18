@@ -88,10 +88,16 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       return
     }
 
+    // Account for the toolbar height and sidebar width
+    const toolbarHeight = 80
+    const sidebarWidth = 256 // w-64 = 256px
+    const canvasWidth = window.innerWidth - sidebarWidth
+    const canvasHeight = window.innerHeight - toolbarHeight
+
     const viewportLeft = -panOffset.x
-    const viewportRight = -panOffset.x + window.innerWidth
+    const viewportRight = -panOffset.x + canvasWidth
     const viewportTop = -panOffset.y
-    const viewportBottom = -panOffset.y + window.innerHeight
+    const viewportBottom = -panOffset.y + canvasHeight
 
     let hasLeft = false
     let hasRight = false
@@ -340,17 +346,14 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     let cardX = x
     let cardY = y
     
-    // If no specific position provided, place in upper-left of current viewport
+    // If no specific position provided, place at current viewport top-left (no additional margin)
     if (cardX === undefined || cardY === undefined) {
       const viewportLeft = -panOffset.x
       const viewportTop = -panOffset.y
       
-      // Grid margin (1 square = 20px) from workspace viewport edges
-      const gridMargin = gridSize * 1
-      
-      // Position in upper-left with margin
-      cardX = viewportLeft + gridMargin
-      cardY = viewportTop + gridMargin
+      // Position at viewport top-left (reset/navigation already handles margins)
+      cardX = viewportLeft
+      cardY = viewportTop
     }
     
     // Apply snap to grid if enabled
@@ -567,44 +570,63 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     }
   }
 
-  // SIMPLE reset function - ALWAYS 1 grid square from workspace viewport edges
+  // RESET function - ALWAYS positions to Page 1,1 (top-left cards at 1 grid box margin)
   const resetViewToShowContent = () => {
+    const gridMargin = gridSize * 1 // 20px
+    
     if (cards.length === 0) {
-      // No cards, just reset to workspace viewport origin + 1 grid box
-      const gridMargin = gridSize * 1 // 20px
+      // No cards, just reset to Page 1,1 position
       setPanOffset({ x: gridMargin, y: gridMargin })
       return
     }
 
-    // Calculate bounding box of all cards
+    // Find the absolute top-left cards (Page 1,1)
     const minX = Math.min(...cards.map(card => card.x))
     const minY = Math.min(...cards.map(card => card.y))
-
-    // Grid margin (1 square = 20px) from workspace viewport edges
-    const gridMargin = gridSize * 1 // 20px
     
-    // Position with exactly 1 grid square from workspace viewport top-left
+    // Debug logging
+    console.log('🔍 RESET DEBUG:')
+    console.log('  gridMargin:', gridMargin)
+    console.log('  minX (leftmost card x):', minX)
+    console.log('  minY (topmost card y):', minY)
+    console.log('  Required panOffset.x:', gridMargin - minX)
+    console.log('  Required panOffset.y:', gridMargin - minY)
+    
+    // To position the leftmost card at gridMargin (20px) from the left edge:
+    // We need: minX + panOffset.x = gridMargin
+    // Therefore: panOffset.x = gridMargin - minX
     const newPanOffset = {
       x: gridMargin - minX,
       y: gridMargin - minY
     }
 
     setPanOffset(newPanOffset)
+    
+    // Verify positioning after a brief delay
+    setTimeout(() => {
+      console.log('🔍 POST-RESET DEBUG:')
+      console.log('  panOffset after reset:', newPanOffset)
+      console.log('  Expected leftmost card screen position: minX + panOffset.x =', minX + newPanOffset.x)
+      console.log('  Should equal gridMargin (20px):', gridMargin)
+    }, 100)
   }
 
   // Paging navigation functions
   const navigateToDirection = (direction: 'left' | 'right' | 'up' | 'down') => {
     if (typeof window === 'undefined' || cards.length === 0) return
 
-    const viewportWidth = window.innerWidth
-    const viewportHeight = window.innerHeight
+    // Account for the toolbar height and sidebar width
+    const toolbarHeight = 80
+    const sidebarWidth = 256 // w-64 = 256px
+    const viewportWidth = window.innerWidth - sidebarWidth
+    const viewportHeight = window.innerHeight - toolbarHeight
     const gridMargin = gridSize * 1 // 1 grid box margin
 
     // Current viewport bounds in world coordinates
-    const viewportLeft = -panOffset.x + gridMargin
-    const viewportRight = -panOffset.x + viewportWidth - gridMargin
-    const viewportTop = -panOffset.y + gridMargin
-    const viewportBottom = -panOffset.y + viewportHeight - gridMargin
+    const viewportLeft = -panOffset.x
+    const viewportRight = -panOffset.x + viewportWidth
+    const viewportTop = -panOffset.y
+    const viewportBottom = -panOffset.y + viewportHeight
 
     // Find cards in the specified direction
     let targetCards: CardType[] = []
@@ -643,6 +665,13 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     if ((direction === 'up' && targetMinY === allMinY) || 
         (direction === 'left' && targetMinX === allMinX)) {
       // Use reset logic - show all cards with optimal positioning
+      console.log('🔍 NAVIGATION TO PRIMARY CARDS - Using reset logic')
+      console.log('  direction:', direction)
+      console.log('  allMinX:', allMinX, 'targetMinX:', targetMinX)
+      console.log('  allMinY:', allMinY, 'targetMinY:', targetMinY)
+      console.log('  gridMargin:', gridMargin)
+      console.log('  Setting panOffset to:', { x: gridMargin - allMinX, y: gridMargin - allMinY })
+      
       const newPanOffset = {
         x: gridMargin - allMinX,
         y: gridMargin - allMinY
@@ -691,6 +720,14 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     // Get the leftmost and topmost positions of the closest cards group
     const closestMinX = Math.min(...closestCards.map(card => card.x))
     const closestMinY = Math.min(...closestCards.map(card => card.y))
+
+    console.log('🔍 NAVIGATION TO CLOSEST CARDS')
+    console.log('  direction:', direction)
+    console.log('  closestCards count:', closestCards.length)
+    console.log('  closestMinX:', closestMinX)
+    console.log('  closestMinY:', closestMinY)
+    console.log('  gridMargin:', gridMargin)
+    console.log('  Setting panOffset to:', { x: gridMargin - closestMinX, y: gridMargin - closestMinY })
 
     // Position with exactly 1 grid square from workspace viewport top-left
     const newPanOffset = {

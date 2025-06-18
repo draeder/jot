@@ -317,8 +317,8 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Workspaces</h2>
         
-        {/* Undo/Redo Buttons - aligned with New Workspace button */}
-        <div className="flex justify-center gap-1 mb-3">
+        {/* Undo/Redo Buttons - left justified */}
+        <div className="flex justify-start gap-1 mb-3">
           <button
             onClick={performUndo}
             disabled={undoStack.length === 0}
