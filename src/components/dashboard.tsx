@@ -101,7 +101,10 @@ export default function Dashboard() {
         
         <div className="flex-1 flex flex-col min-w-0">
           {selectedWorkspaceId ? (
-            <WorkspaceCanvas workspaceId={selectedWorkspaceId} />
+            <>
+              {console.log('🏠 Rendering WorkspaceCanvas for workspace:', selectedWorkspaceId)}
+              <WorkspaceCanvas workspaceId={selectedWorkspaceId} />
+            </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
               <div className="text-center">

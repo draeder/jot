@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragCancelEvent, useSensor, useSensors, PointerSensor, rectIntersection } from '@dnd-kit/core'
 import { Card as CardType, Connection, db } from '@/lib/db'
 import Card from './card'
-import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo } from 'lucide-react'
+import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo, Redo, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 
 // Undo action types
@@ -29,6 +29,7 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   const [firstConnectionCard, setFirstConnectionCard] = useState<string | null>(null)
   const [forceFinishEditingTimestamp, setForceFinishEditingTimestamp] = useState(0)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+  const [redoStack, setRedoStack] = useState<UndoAction[]>([])
   const [gridEnabled, setGridEnabled] = useState(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('jot-grid-enabled')
@@ -58,6 +59,14 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   // Grid settings
   const gridSize = 20 // 20px grid
 
+  // Paging state
+  const [pageIndicators, setPageIndicators] = useState<{
+    left: boolean
+    right: boolean
+    up: boolean
+    down: boolean
+  }>({ left: false, right: false, up: false, down: false })
+
   // Persist pan offset to localStorage
   useEffect(() => {
     localStorage.setItem('jot-pan-offset', JSON.stringify(panOffset))
@@ -72,9 +81,54 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     localStorage.setItem('jot-snap-to-grid', snapToGrid.toString())
   }, [snapToGrid])
 
+  // Simple rule: if ANY card is outside viewport, show directional indicator
+  const calculatePageIndicators = useCallback(() => {
+    if (typeof window === 'undefined' || cards.length === 0) {
+      setPageIndicators({ left: false, right: false, up: false, down: false })
+      return
+    }
+
+    const viewportLeft = -panOffset.x
+    const viewportRight = -panOffset.x + window.innerWidth
+    const viewportTop = -panOffset.y
+    const viewportBottom = -panOffset.y + window.innerHeight
+
+    let hasLeft = false
+    let hasRight = false
+    let hasUp = false
+    let hasDown = false
+
+    cards.forEach(card => {
+      // Card is off-screen left if its right edge is left of viewport
+      if (card.x + card.width < viewportLeft) hasLeft = true
+      // Card is off-screen right if its left edge is right of viewport
+      if (card.x > viewportRight) hasRight = true
+      // Card is off-screen up if its bottom edge is above viewport
+      if (card.y + card.height < viewportTop) hasUp = true
+      // Card is off-screen down if its top edge is below viewport
+      if (card.y > viewportBottom) hasDown = true
+    })
+
+    setPageIndicators({ left: hasLeft, right: hasRight, up: hasUp, down: hasDown })
+  }, [cards, panOffset])
+
+  // Update page indicators when cards or pan offset changes
+  useEffect(() => {
+    calculatePageIndicators()
+  }, [calculatePageIndicators])
+
+  // Also recalculate on window resize
+  useEffect(() => {
+    const handleResize = () => calculatePageIndicators()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [calculatePageIndicators])
+
   // Helper function to add action to undo stack
   const addToUndoStack = (action: UndoAction) => {
     setUndoStack(prev => [...prev, action].slice(-50)) // Keep last 50 actions
+    // Clear redo stack when a new action is performed
+    setRedoStack([])
   }
 
   // Undo function
@@ -83,6 +137,9 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
 
     const lastAction = undoStack[undoStack.length - 1]
     setUndoStack(prev => prev.slice(0, -1))
+    
+    // Add the action to redo stack before undoing
+    setRedoStack(prev => [...prev, lastAction].slice(-50))
 
     try {
       switch (lastAction.type) {
@@ -146,8 +203,95 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       }
     } catch (error) {
       console.error('Error performing undo:', error)
-      // Re-add the action to the stack if undo failed
+      // Re-add the action to the undo stack and remove from redo stack if undo failed
       setUndoStack(prev => [...prev, lastAction])
+      setRedoStack(prev => prev.slice(0, -1))
+    }
+  }
+
+  // Redo function
+  const performRedo = async () => {
+    if (redoStack.length === 0) return
+
+    const lastRedoAction = redoStack[redoStack.length - 1]
+    setRedoStack(prev => prev.slice(0, -1))
+    
+    // Add the action back to undo stack
+    setUndoStack(prev => [...prev, lastRedoAction].slice(-50))
+
+    try {
+      switch (lastRedoAction.type) {
+        case 'CREATE_CARD':
+          // Redo card creation by recreating the card
+          const cardToRecreate = await db.cards.get(lastRedoAction.cardId)
+          if (cardToRecreate) {
+            setCards(prev => [...prev, cardToRecreate])
+          }
+          break
+
+        case 'DELETE_CARD':
+          // Redo card deletion by deleting the card again
+          await db.cards.delete(lastRedoAction.card.id)
+          
+          // Also delete connections involving this card
+          for (const conn of lastRedoAction.connections) {
+            await db.connections.delete(conn.id)
+          }
+          
+          setCards(prev => prev.filter(card => card.id !== lastRedoAction.card.id))
+          setConnections(prev => prev.filter(
+            conn => conn.fromCardId !== lastRedoAction.card.id && conn.toCardId !== lastRedoAction.card.id
+          ))
+          
+          if (selectedCardId === lastRedoAction.card.id) {
+            setSelectedCardId(null)
+          }
+          break
+
+        case 'UPDATE_CARD':
+          // Redo card update by applying the new card data
+          await db.cards.update(lastRedoAction.newCard.id, lastRedoAction.newCard)
+          setCards(prev => prev.map(card => 
+            card.id === lastRedoAction.newCard.id ? lastRedoAction.newCard : card
+          ))
+          break
+
+        case 'MOVE_CARD':
+          // Redo card move by restoring new position
+          const cardToRedo = cards.find(c => c.id === lastRedoAction.cardId)
+          if (cardToRedo) {
+            const redoCard = {
+              ...cardToRedo,
+              x: lastRedoAction.newPosition.x,
+              y: lastRedoAction.newPosition.y,
+              updatedAt: new Date()
+            }
+            await db.cards.update(lastRedoAction.cardId, redoCard)
+            setCards(prev => prev.map(card => 
+              card.id === lastRedoAction.cardId ? redoCard : card
+            ))
+          }
+          break
+
+        case 'CREATE_CONNECTION':
+          // Redo connection creation by recreating the connection
+          const connectionToRecreate = await db.connections.get(lastRedoAction.connectionId)
+          if (connectionToRecreate) {
+            setConnections(prev => [...prev, connectionToRecreate])
+          }
+          break
+
+        case 'DELETE_CONNECTION':
+          // Redo connection deletion by deleting the connection again
+          await db.connections.delete(lastRedoAction.connection.id)
+          setConnections(prev => prev.filter(conn => conn.id !== lastRedoAction.connection.id))
+          break
+      }
+    } catch (error) {
+      console.error('Error performing redo:', error)
+      // Remove from undo stack and re-add to redo stack if redo failed
+      setUndoStack(prev => prev.slice(0, -1))
+      setRedoStack(prev => [...prev, lastRedoAction])
     }
   }
 
@@ -448,6 +592,115 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     setPanOffset(newPanOffset)
   }
 
+  // Paging navigation functions
+  const navigateToDirection = (direction: 'left' | 'right' | 'up' | 'down') => {
+    if (typeof window === 'undefined' || cards.length === 0) return
+
+    const viewportWidth = window.innerWidth
+    const viewportHeight = window.innerHeight
+    const gridMargin = gridSize * 1 // 1 grid box margin
+
+    // Current viewport bounds in world coordinates
+    const viewportLeft = -panOffset.x + gridMargin
+    const viewportRight = -panOffset.x + viewportWidth - gridMargin
+    const viewportTop = -panOffset.y + gridMargin
+    const viewportBottom = -panOffset.y + viewportHeight - gridMargin
+
+    // Find cards in the specified direction
+    let targetCards: CardType[] = []
+
+    cards.forEach(card => {
+      const cardLeft = card.x
+      const cardRight = card.x + card.width
+      const cardTop = card.y
+      const cardBottom = card.y + card.height
+
+      switch (direction) {
+        case 'left':
+          if (cardRight < viewportLeft) targetCards.push(card)
+          break
+        case 'right':
+          if (cardLeft > viewportRight) targetCards.push(card)
+          break
+        case 'up':
+          if (cardBottom < viewportTop) targetCards.push(card)
+          break
+        case 'down':
+          if (cardTop > viewportBottom) targetCards.push(card)
+          break
+      }
+    })
+
+    if (targetCards.length === 0) return
+
+    // Check if we're navigating to the primary/topmost cards - use reset logic
+    const allMinX = Math.min(...cards.map(card => card.x))
+    const allMinY = Math.min(...cards.map(card => card.y))
+    const targetMinX = Math.min(...targetCards.map(card => card.x))
+    const targetMinY = Math.min(...targetCards.map(card => card.y))
+
+    // If we're navigating to cards that include the absolute topmost/leftmost cards, use reset logic
+    if ((direction === 'up' && targetMinY === allMinY) || 
+        (direction === 'left' && targetMinX === allMinX)) {
+      // Use reset logic - show all cards with optimal positioning
+      const newPanOffset = {
+        x: gridMargin - allMinX,
+        y: gridMargin - allMinY
+      }
+      setPanOffset(newPanOffset)
+      return
+    }
+
+    // Otherwise, find the closest group of cards in that direction
+    let closestCards: CardType[] = []
+
+    if (direction === 'left' || direction === 'right') {
+      // Find cards closest to the viewport in the x-direction
+      const distances = targetCards.map(card => {
+        if (direction === 'left') {
+          return viewportLeft - (card.x + card.width) // distance from viewport left to card right
+        } else {
+          return card.x - viewportRight // distance from viewport right to card left
+        }
+      })
+      const minDistance = Math.min(...distances.filter(d => d >= 0))
+      
+      // Filter to cards at this closest distance (with some tolerance)
+      closestCards = targetCards.filter((card, index) => {
+        const distance = distances[index]
+        return distance >= 0 && distance <= minDistance + 50 // 50px tolerance
+      })
+    } else {
+      // Find cards closest to the viewport in the y-direction
+      const distances = targetCards.map(card => {
+        if (direction === 'up') {
+          return viewportTop - (card.y + card.height) // distance from viewport top to card bottom
+        } else {
+          return card.y - viewportBottom // distance from viewport bottom to card top
+        }
+      })
+      const minDistance = Math.min(...distances.filter(d => d >= 0))
+      
+      // Filter to cards at this closest distance (with some tolerance)
+      closestCards = targetCards.filter((card, index) => {
+        const distance = distances[index]
+        return distance >= 0 && distance <= minDistance + 50 // 50px tolerance
+      })
+    }
+
+    // Get the leftmost and topmost positions of the closest cards group
+    const closestMinX = Math.min(...closestCards.map(card => card.x))
+    const closestMinY = Math.min(...closestCards.map(card => card.y))
+
+    // Position with exactly 1 grid square from workspace viewport top-left
+    const newPanOffset = {
+      x: gridMargin - closestMinX,
+      y: gridMargin - closestMinY
+    }
+
+    setPanOffset(newPanOffset)
+  }
+
   const handleCanvasClick = (e: React.MouseEvent) => {
     // Only handle clicks on the background, not on cards or other elements
     const target = e.target as HTMLElement
@@ -643,20 +896,36 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
             </button>
           )}
           
-          {/* Undo Button */}
-          <button
-            onClick={performUndo}
-            disabled={undoStack.length === 0}
-            className={`flex items-center gap-2 px-3 py-2 rounded ${
-              undoStack.length === 0
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-            }`}
-            title={`Undo (${undoStack.length} actions available)`}
-          >
-            <Undo size={16} />
-            Undo
-          </button>
+          {/* Undo/Redo Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={performUndo}
+              disabled={undoStack.length === 0}
+              className={`flex items-center gap-2 px-3 py-2 rounded ${
+                undoStack.length === 0
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title={`Undo (${undoStack.length} actions available)`}
+            >
+              <Undo size={16} />
+              Undo
+            </button>
+            
+            <button
+              onClick={performRedo}
+              disabled={redoStack.length === 0}
+              className={`flex items-center gap-2 px-3 py-2 rounded ${
+                redoStack.length === 0
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title={`Redo (${redoStack.length} actions available)`}
+            >
+              <Redo size={16} />
+              Redo
+            </button>
+          </div>
           
           {/* Grid Controls */}
           <div className="flex items-center gap-3 ml-4 border-l border-gray-300 pl-4">
@@ -741,6 +1010,58 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
         onMouseLeave={handleCanvasMouseLeave}
         onClick={handleCanvasClick}
       >
+        {/* Paging Indicators */}
+        {pageIndicators.left && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigateToDirection('left')
+            }}
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            title="Navigate to cards on the left"
+          >
+            <ChevronLeft size={20} className="text-gray-600" />
+          </button>
+        )}
+        
+        {pageIndicators.right && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigateToDirection('right')
+            }}
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            title="Navigate to cards on the right"
+          >
+            <ChevronRight size={20} className="text-gray-600" />
+          </button>
+        )}
+        
+        {pageIndicators.up && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigateToDirection('up')
+            }}
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            title="Navigate to cards above"
+          >
+            <ChevronUp size={20} className="text-gray-600" />
+          </button>
+        )}
+        
+        {pageIndicators.down && (
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              navigateToDirection('down')
+            }}
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            title="Navigate to cards below"
+          >
+            <ChevronDown size={20} className="text-gray-600" />
+          </button>
+        )}
         <DndContext
           sensors={sensors}  
           onDragStart={handleDragStart}
