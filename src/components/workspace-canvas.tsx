@@ -30,12 +30,12 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   const [forceFinishEditingTimestamp, setForceFinishEditingTimestamp] = useState(0)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [redoStack, setRedoStack] = useState<UndoAction[]>([])
-  const [gridEnabled, setGridEnabled] = useState(() => {
+  const [gridType, setGridType] = useState<'off' | 'dots' | 'lines'>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('jot-grid-enabled')
-      return saved ? saved === 'true' : false
+      const saved = localStorage.getItem('jot-grid-type')
+      return (saved as 'off' | 'dots' | 'lines') || 'dots'
     }
-    return false
+    return 'dots'
   })
   const [snapToGrid, setSnapToGrid] = useState(() => {
     if (typeof window !== 'undefined') {
@@ -74,8 +74,8 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
 
   // Save grid settings to localStorage when they change
   useEffect(() => {
-    localStorage.setItem('jot-grid-enabled', gridEnabled.toString())
-  }, [gridEnabled])
+    localStorage.setItem('jot-grid-type', gridType)
+  }, [gridType])
 
   useEffect(() => {
     localStorage.setItem('jot-snap-to-grid', snapToGrid.toString())
@@ -967,16 +967,19 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
           {/* Grid Controls */}
           <div className="flex items-center gap-3 ml-4 border-l border-gray-300 pl-4">
             <button
-              onClick={() => setGridEnabled(!gridEnabled)}
+              onClick={() => {
+                const nextType = gridType === 'off' ? 'dots' : gridType === 'dots' ? 'lines' : 'off'
+                setGridType(nextType)
+              }}
               className={`flex items-center gap-2 px-3 py-2 rounded ${
-                gridEnabled 
+                gridType !== 'off'
                   ? 'bg-purple-500 text-white hover:bg-purple-600' 
                   : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
               }`}
-              title="Toggle Grid"
+              title={`Grid: ${gridType === 'off' ? 'Off' : gridType === 'dots' ? 'Dots' : 'Lines'} (click to cycle)`}
             >
               <Grid3X3 size={16} />
-              Grid
+              {gridType === 'off' ? 'Grid: Off' : gridType === 'dots' ? 'Grid: Dots' : 'Grid: Lines'}
             </button>
             
             {/* Snap to Grid Toggle */}
@@ -1035,11 +1038,13 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       <div 
         className={`flex-1 overflow-hidden bg-gray-50 relative ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
         style={{
-          backgroundImage: gridEnabled ? 
-            `linear-gradient(to right, #d1d5db 1px, transparent 1px), linear-gradient(to bottom, #d1d5db 1px, transparent 1px)` : 
+          backgroundImage: gridType === 'lines' ? 
+            `linear-gradient(to right, #d1d5db 1px, transparent 1px), linear-gradient(to bottom, #d1d5db 1px, transparent 1px)` :
+            gridType === 'dots' ?
+            `radial-gradient(circle, #d1d5db 1px, transparent 1px)` :
             'none',
-          backgroundSize: gridEnabled ? `${gridSize}px ${gridSize}px` : 'auto',
-          backgroundPosition: gridEnabled ? `${panOffset.x % gridSize}px ${panOffset.y % gridSize}px` : 'auto',
+          backgroundSize: gridType !== 'off' ? `${gridSize}px ${gridSize}px` : 'auto',
+          backgroundPosition: gridType !== 'off' ? `${panOffset.x % gridSize}px ${panOffset.y % gridSize}px` : 'auto',
         }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
