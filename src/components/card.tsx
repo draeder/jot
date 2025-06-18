@@ -12,14 +12,38 @@ interface CardProps {
   onDelete: (cardId: string) => void
   onSelect: (cardId: string) => void
   isSelected: boolean
+  snapToGrid?: boolean
+  gridSize?: number
+  forceFinishEditingTimestamp?: number
+  connectingMode?: boolean
 }
 
-export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }: CardProps) {
+export default function Card({ 
+  card, 
+  onUpdate, 
+  onDelete, 
+  onSelect, 
+  isSelected, 
+  snapToGrid = false, 
+  gridSize = 20,
+  forceFinishEditingTimestamp = 0,
+  connectingMode = false
+}: CardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [title, setTitle] = useState(card.title)
   const [content, setContent] = useState(card.content)
   const [isResizing, setIsResizing] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
+
+  // Snap dimensions to grid
+  const snapToGridDimensions = (width: number, height: number) => {
+    if (!snapToGrid) return { width, height }
+    
+    return {
+      width: Math.round(width / gridSize) * gridSize,
+      height: Math.round(height / gridSize) * gridSize
+    }
+  }
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -46,17 +70,24 @@ export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }:
       if (!isResizing || !cardRef.current) return
 
       const rect = cardRef.current.getBoundingClientRect()
-      const newWidth = e.clientX - rect.left
-      const newHeight = e.clientY - rect.top
+      let newWidth = e.clientX - rect.left
+      let newHeight = e.clientY - rect.top
 
-      if (newWidth > 200 && newHeight > 150) {
-        onUpdate({
-          ...card,
-          width: newWidth,
-          height: newHeight,
-          updatedAt: new Date(),
-        })
-      }
+      // Apply minimum size constraints
+      newWidth = Math.max(200, newWidth)
+      newHeight = Math.max(150, newHeight)
+
+      // Apply snap to grid if enabled
+      const snappedDimensions = snapToGridDimensions(newWidth, newHeight)
+      newWidth = snappedDimensions.width
+      newHeight = snappedDimensions.height
+
+      onUpdate({
+        ...card,
+        width: newWidth,
+        height: newHeight,
+        updatedAt: new Date(),
+      })
     }
 
     const handleMouseUp = () => {
@@ -72,7 +103,7 @@ export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }:
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isResizing, card, onUpdate])
+  }, [isResizing, card, onUpdate, snapToGrid, gridSize])
 
   const handleSave = () => {
     onUpdate({
@@ -90,6 +121,13 @@ export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }:
     setIsEditing(false)
   }
 
+  // Effect to handle forced finish editing from parent
+  useEffect(() => {
+    if (forceFinishEditingTimestamp > 0 && isEditing) {
+      handleSave()
+    }
+  }, [forceFinishEditingTimestamp])
+
   return (
     <div
       ref={(node) => {
@@ -101,10 +139,15 @@ export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }:
         width: card.width,
         height: card.height,
       }}
-      className={`absolute bg-white border-2 rounded-lg shadow-lg flex flex-col ${
+      className={`absolute bg-white border-2 rounded-lg shadow-lg flex flex-col cursor-default ${
         isSelected ? 'border-blue-500' : 'border-gray-200'
-      } ${isDragging ? 'opacity-50' : ''}`}
-      onClick={() => onSelect(card.id)}
+      } ${isDragging ? 'opacity-50' : ''} ${
+        connectingMode ? 'hover:border-orange-400 hover:shadow-orange-200' : ''
+      }`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onSelect(card.id)
+      }}
     >
       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
         <div className="flex items-center gap-2 flex-1">
@@ -186,8 +229,19 @@ export default function Card({ card, onUpdate, onDelete, onSelect, isSelected }:
           />
         ) : (
           <div 
-            className="prose prose-sm max-w-none h-full overflow-y-auto"
-            dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click edit to add content...</p>' }}
+            className={`prose prose-sm max-w-none h-full overflow-y-auto hover:bg-gray-50 ${
+              connectingMode ? 'cursor-crosshair' : 'cursor-pointer'
+            }`}
+            onClick={(e) => {
+              e.stopPropagation()
+              // If in connecting mode, prioritize connection over editing
+              if (connectingMode) {
+                onSelect(card.id)
+              } else {
+                setIsEditing(true)
+              }
+            }}
+            dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click to add content...</p>' }}
           />
         )}
       </div>

@@ -93,13 +93,13 @@ export default function Dashboard() {
       </header>
 
       {/* Main content */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="flex-1 flex overflow-hidden min-h-0">
         <WorkspaceSelector
           selectedWorkspaceId={selectedWorkspaceId}
           onWorkspaceSelect={setSelectedWorkspaceId}
         />
         
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           {selectedWorkspaceId ? (
             <WorkspaceCanvas workspaceId={selectedWorkspaceId} />
           ) : (

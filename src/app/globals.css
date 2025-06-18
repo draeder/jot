@@ -3,7 +3,6 @@
 /* Rich Text Editor Styles */
 .ProseMirror {
   outline: none !important;
-  color: #000000 !important;
   line-height: 1.6;
   padding: 0;
   margin: 0;
@@ -11,6 +10,7 @@
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   caret-color: #000000 !important;
   cursor: text;
+  color: #000000 !important;
 }
 
 .ProseMirror:focus {
@@ -26,45 +26,135 @@
   outline: none !important;
 }
 
-/* Ensure cursor is visible */
-.ProseMirror * {
-  caret-color: #000000 !important;
+/* Regular text elements - ALL BLACK */
+.ProseMirror p {
+  color: #000000 !important;
+  margin: 0.5em 0;
 }
 
-/* Placeholder styles */
-.ProseMirror p.is-editor-empty:first-child::before {
-  content: attr(data-placeholder);
-  float: left;
-  color: #9ca3af;
-  pointer-events: none;
-  height: 0;
+.ProseMirror h1,
+.ProseMirror h2, 
+.ProseMirror h3,
+.ProseMirror h4,
+.ProseMirror h5,
+.ProseMirror h6 {
+  color: #000000 !important;
+  font-weight: bold;
+}
+
+.ProseMirror strong {
+  color: #000000 !important;
+  font-weight: bold;
+}
+
+.ProseMirror em {
+  color: #000000 !important;
   font-style: italic;
 }
 
-/* Prose styles for rich text content */
-.prose {
-  max-width: none !important;
+/* Inline code styling - BLACK TEXT */
+.ProseMirror code {
+  background: #f3f4f6 !important;
   color: #000000 !important;
+  padding: 2px 4px !important;
+  border-radius: 3px !important;
+  font-family: 'SF Mono', Monaco, 'Inconsolata', 'Roboto Mono', 'Source Code Pro', Menlo, Consolas, 'DejaVu Sans Mono', monospace !important;
+  font-size: 0.875em !important;
+}
+
+/* Rich Text Editor Toolbar Styling */
+.rich-text-editor .ProseMirror {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  outline: none !important;
+}
+
+.rich-text-editor .ProseMirror:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* Toolbar button styling - PROPER STROKE ICONS */
+.rich-text-editor button {
+  color: #000000 !important;
+}
+
+.rich-text-editor button svg {
+  stroke: #000000 !important;
+  fill: none !important;
+  stroke-width: 2 !important;
+}
+
+.rich-text-editor button:disabled svg {
+  stroke: #9ca3af !important;
+  fill: none !important;
+}
+
+.rich-text-editor button span {
+  color: #000000 !important;
+}
+
+/* Lists styling */
+.ProseMirror ul {
+  list-style-type: disc !important;
+  padding-left: 1.5em !important;
+  margin: 0.5em 0 !important;
+}
+
+.ProseMirror ol {
+  list-style-type: decimal !important;
+  padding-left: 1.5em !important;
+  margin: 0.5em 0 !important;
+}
+
+.ProseMirror li {
+  color: #000000 !important;
+  margin: 0.2em 0 !important;
+}
+
+/* Blockquote styling */
+.ProseMirror blockquote {
+  border-left: 4px solid #e5e7eb !important;
+  padding-left: 1em !important;
+  margin: 1em 0 !important;
+  font-style: italic !important;
+  color: #000000 !important;
+}
+
+.ProseMirror blockquote p {
+  color: #000000 !important;
+  margin: 0 !important;
+}
+
+/* Card content display - BLACK TEXT ON WHITE */
+.prose {
+  color: #000000 !important;
+  background-color: #ffffff !important;
 }
 
 .prose p {
-  margin: 0.5rem 0;
   color: #000000 !important;
 }
 
-.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
-  margin: 1rem 0 0.5rem 0;
+.prose h1,
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
   color: #000000 !important;
-  font-weight: 600;
 }
 
-.prose h1 { font-size: 1.5em; }
-.prose h2 { font-size: 1.3em; }
-.prose h3 { font-size: 1.1em; }
+.prose strong {
+  color: #000000 !important;
+}
 
-.prose ul, .prose ol {
-  margin: 0.5rem 0;
-  padding-left: 1.5rem;
+.prose em {
+  color: #000000 !important;
+}
+
+.prose ul,
+.prose ol {
   color: #000000 !important;
 }
 
@@ -73,29 +163,16 @@
 }
 
 .prose blockquote {
-  border-left: 4px solid #e5e7eb;
-  padding-left: 1rem;
-  margin: 0.5rem 0;
-  color: #4b5563 !important;
-  font-style: italic;
+  color: #000000 !important;
 }
 
-.prose strong {
+.prose a {
   color: #000000 !important;
-  font-weight: 600;
-}
-
-.prose em {
-  color: #000000 !important;
-  font-style: italic;
 }
 
 .prose code {
   color: #000000 !important;
-  background-color: #f3f4f6;
-  padding: 0.125rem 0.25rem;
-  border-radius: 0.25rem;
-  font-size: 0.875em;
+  background-color: #f3f4f6 !important;
 }
 
 :root {
@@ -136,19 +213,47 @@ textarea::placeholder {
   color: #9ca3af !important;
 }
 
-/* Dark mode input text */
+/* Dark mode overrides - FORCE BLACK TEXT ON WHITE BACKGROUND */
 @media (prefers-color-scheme: dark) {
   input[type="text"],
   input[type="email"], 
   input[type="password"],
   input[type="search"],
   textarea {
-    color: #ffffff !important;
-    background-color: #374151 !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
   }
   
   .ProseMirror {
-    color: #ffffff !important;
+    color: #000000 !important;
+    background-color: #ffffff !important;
+  }
+  
+  .prose {
+    color: #000000 !important;
+    background-color: #ffffff !important;
+  }
+  
+  .prose p,
+  .prose h1,
+  .prose h2,
+  .prose h3,
+  .prose h4,
+  .prose h5,
+  .prose h6,
+  .prose strong,
+  .prose em,
+  .prose ul,
+  .prose ol,
+  .prose li,
+  .prose blockquote,
+  .prose a {
+    color: #000000 !important;
+  }
+  
+  .prose code {
+    color: #000000 !important;
+    background-color: #f3f4f6 !important;
   }
   
   input::placeholder,

@@ -136,7 +136,7 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
   }
 
   return (
-    <div className="w-64 bg-white border-r border-gray-200 flex flex-col">
+    <div className="w-64 min-w-64 flex-shrink-0 bg-white border-r border-gray-200 flex flex-col">
       <div className="p-4 border-b border-gray-200">
         <h2 className="text-lg font-semibold text-gray-900 mb-3">Workspaces</h2>
         
@@ -192,14 +192,14 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
         {workspaces.map(workspace => (
           <div
             key={workspace.id}
-            className={`group relative flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer ${
+            className={`group relative flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer min-w-0 ${
               selectedWorkspaceId === workspace.id ? 'bg-blue-50 border-r-2 border-blue-500' : ''
             }`}
             onClick={() => !editingId && onWorkspaceSelect(workspace.id)}
           >
             <FolderOpen 
               size={16} 
-              className={`mr-3 ${
+              className={`mr-3 flex-shrink-0 ${
                 selectedWorkspaceId === workspace.id ? 'text-blue-600' : 'text-gray-400'
               }`} 
             />
@@ -240,13 +240,13 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
               </div>
             ) : (
               <>
-                <span className={`flex-1 text-sm truncate ${
+                <span className={`flex-1 text-sm ${
                   selectedWorkspaceId === workspace.id ? 'text-blue-900 font-medium' : 'text-gray-700'
-                }`}>
+                } overflow-hidden text-ellipsis whitespace-nowrap pr-2`}>
                   {workspace.name}
                 </span>
                 
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1">
+                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 flex-shrink-0 ml-2">
                   <button
                     onClick={(e) => {
                       e.stopPropagation()

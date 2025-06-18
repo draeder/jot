@@ -4,8 +4,17 @@ import { useState, useEffect, useCallback } from 'react'
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragCancelEvent, useSensor, useSensors, PointerSensor, rectIntersection } from '@dnd-kit/core'
 import { Card as CardType, Connection, db } from '@/lib/db'
 import Card from './card'
-import { Plus, ArrowRight, Minus } from 'lucide-react'
+import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
+
+// Undo action types
+type UndoAction = 
+  | { type: 'CREATE_CARD', cardId: string }
+  | { type: 'DELETE_CARD', card: CardType, connections: Connection[] }
+  | { type: 'UPDATE_CARD', oldCard: CardType, newCard: CardType }
+  | { type: 'MOVE_CARD', cardId: string, oldPosition: { x: number, y: number }, newPosition: { x: number, y: number } }
+  | { type: 'CREATE_CONNECTION', connectionId: string }
+  | { type: 'DELETE_CONNECTION', connection: Connection }
 
 interface WorkspaceCanvasProps {
   workspaceId: string
@@ -18,6 +27,129 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null)
   const [connectingMode, setConnectingMode] = useState(false)
   const [firstConnectionCard, setFirstConnectionCard] = useState<string | null>(null)
+  const [forceFinishEditingTimestamp, setForceFinishEditingTimestamp] = useState(0)
+  const [undoStack, setUndoStack] = useState<UndoAction[]>([])
+  const [gridEnabled, setGridEnabled] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jot-grid-enabled')
+      return saved ? saved === 'true' : false
+    }
+    return false
+  })
+  const [snapToGrid, setSnapToGrid] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jot-snap-to-grid')
+      return saved ? saved === 'true' : false
+    }
+    return false
+  })
+
+  // Workspace panning state
+  const [isPanning, setIsPanning] = useState(false)
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 })
+  const [panOffset, setPanOffset] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jot-pan-offset')
+      return saved ? JSON.parse(saved) : { x: 0, y: 0 }
+    }
+    return { x: 0, y: 0 }
+  })
+
+  // Grid settings
+  const gridSize = 20 // 20px grid
+
+  // Persist pan offset to localStorage
+  useEffect(() => {
+    localStorage.setItem('jot-pan-offset', JSON.stringify(panOffset))
+  }, [panOffset])
+
+  // Save grid settings to localStorage when they change
+  useEffect(() => {
+    localStorage.setItem('jot-grid-enabled', gridEnabled.toString())
+  }, [gridEnabled])
+
+  useEffect(() => {
+    localStorage.setItem('jot-snap-to-grid', snapToGrid.toString())
+  }, [snapToGrid])
+
+  // Helper function to add action to undo stack
+  const addToUndoStack = (action: UndoAction) => {
+    setUndoStack(prev => [...prev, action].slice(-50)) // Keep last 50 actions
+  }
+
+  // Undo function
+  const performUndo = async () => {
+    if (undoStack.length === 0) return
+
+    const lastAction = undoStack[undoStack.length - 1]
+    setUndoStack(prev => prev.slice(0, -1))
+
+    try {
+      switch (lastAction.type) {
+        case 'CREATE_CARD':
+          // Undo card creation by deleting the card
+          await db.cards.delete(lastAction.cardId)
+          setCards(prev => prev.filter(card => card.id !== lastAction.cardId))
+          if (selectedCardId === lastAction.cardId) {
+            setSelectedCardId(null)
+          }
+          break
+
+        case 'DELETE_CARD':
+          // Undo card deletion by recreating the card and its connections
+          await db.cards.add(lastAction.card)
+          setCards(prev => [...prev, lastAction.card])
+          
+          // Restore connections
+          for (const connection of lastAction.connections) {
+            await db.connections.add(connection)
+          }
+          setConnections(prev => [...prev, ...lastAction.connections])
+          break
+
+        case 'UPDATE_CARD':
+          // Undo card update by restoring old card data
+          await db.cards.update(lastAction.oldCard.id, lastAction.oldCard)
+          setCards(prev => prev.map(card => 
+            card.id === lastAction.oldCard.id ? lastAction.oldCard : card
+          ))
+          break
+
+        case 'MOVE_CARD':
+          // Undo card move by restoring old position
+          const cardToMove = cards.find(c => c.id === lastAction.cardId)
+          if (cardToMove) {
+            const restoredCard = {
+              ...cardToMove,
+              x: lastAction.oldPosition.x,
+              y: lastAction.oldPosition.y,
+              updatedAt: new Date()
+            }
+            await db.cards.update(lastAction.cardId, restoredCard)
+            setCards(prev => prev.map(card => 
+              card.id === lastAction.cardId ? restoredCard : card
+            ))
+          }
+          break
+
+        case 'CREATE_CONNECTION':
+          // Undo connection creation by deleting the connection
+          await db.connections.delete(lastAction.connectionId)
+          setConnections(prev => prev.filter(conn => conn.id !== lastAction.connectionId))
+          break
+
+        case 'DELETE_CONNECTION':
+          // Undo connection deletion by recreating the connection
+          await db.connections.add(lastAction.connection)
+          setConnections(prev => [...prev, lastAction.connection])
+          break
+      }
+    } catch (error) {
+      console.error('Error performing undo:', error)
+      // Re-add the action to the stack if undo failed
+      setUndoStack(prev => [...prev, lastAction])
+    }
+  }
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -50,14 +182,43 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     loadConnections()
   }, [loadCards, loadConnections])
 
-  const createCard = async (x: number = 20, y: number = 20) => {
+  // Snap coordinates to grid
+  const snapToGridCoordinates = (x: number, y: number) => {
+    if (!snapToGrid) return { x, y }
+    
+    return {
+      x: Math.round(x / gridSize) * gridSize,
+      y: Math.round(y / gridSize) * gridSize
+    }
+  }
+
+  const createCard = async (x?: number, y?: number) => {
+    let cardX = x
+    let cardY = y
+    
+    // If no specific position provided, place in upper-left of current viewport
+    if (cardX === undefined || cardY === undefined) {
+      const viewportLeft = -panOffset.x
+      const viewportTop = -panOffset.y
+      
+      // Grid margin (1 square = 20px) from workspace viewport edges
+      const gridMargin = gridSize * 1
+      
+      // Position in upper-left with margin
+      cardX = viewportLeft + gridMargin
+      cardY = viewportTop + gridMargin
+    }
+    
+    // Apply snap to grid if enabled
+    const snappedCoords = snapToGridCoordinates(cardX, cardY)
+    
     const newCard: CardType = {
       id: uuidv4(),
       workspaceId,
       title: 'New Card',
       content: '',
-      x,
-      y,
+      x: snappedCoords.x,
+      y: snappedCoords.y,
       width: 350,
       height: 280,
       createdAt: new Date(),
@@ -68,15 +229,26 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       await db.cards.add(newCard)
       setCards(prev => [...prev, newCard])
       setSelectedCardId(newCard.id)
+      
+      // Add to undo stack
+      addToUndoStack({ type: 'CREATE_CARD', cardId: newCard.id })
     } catch (error) {
       console.error('Error creating card:', error)
     }
   }
 
   const updateCard = async (updatedCard: CardType) => {
+    // Get the old card for undo
+    const oldCard = cards.find(c => c.id === updatedCard.id)
+    
     try {
       await db.cards.update(updatedCard.id, updatedCard)
       setCards(prev => prev.map(card => card.id === updatedCard.id ? updatedCard : card))
+      
+      // Add to undo stack if we have the old card and it's different
+      if (oldCard && (oldCard.title !== updatedCard.title || oldCard.content !== updatedCard.content)) {
+        addToUndoStack({ type: 'UPDATE_CARD', oldCard, newCard: updatedCard })
+      }
     } catch (error) {
       console.error('Error updating card:', error)
     }
@@ -93,12 +265,17 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   }
 
   const deleteCard = async (cardId: string) => {
+    const cardToDelete = cards.find(c => c.id === cardId)
+    if (!cardToDelete) return
+    
     try {
-      await db.cards.delete(cardId)
-      // Also delete connections involving this card
+      // Get connections that will be deleted
       const cardConnections = connections.filter(
         conn => conn.fromCardId === cardId || conn.toCardId === cardId
       )
+      
+      await db.cards.delete(cardId)
+      // Also delete connections involving this card
       for (const conn of cardConnections) {
         await db.connections.delete(conn.id)
       }
@@ -111,6 +288,13 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       if (selectedCardId === cardId) {
         setSelectedCardId(null)
       }
+      
+      // Add to undo stack
+      addToUndoStack({ 
+        type: 'DELETE_CARD', 
+        card: cardToDelete, 
+        connections: cardConnections 
+      })
     } catch (error) {
       console.error('Error deleting card:', error)
     }
@@ -140,15 +324,24 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     try {
       await db.connections.add(newConnection)
       setConnections(prev => [...prev, newConnection])
+      
+      // Add to undo stack
+      addToUndoStack({ type: 'CREATE_CONNECTION', connectionId: newConnection.id })
     } catch (error) {
       console.error('Error creating connection:', error)
     }
   }
 
   const deleteConnection = async (connectionId: string) => {
+    const connectionToDelete = connections.find(c => c.id === connectionId)
+    if (!connectionToDelete) return
+    
     try {
       await db.connections.delete(connectionId)
       setConnections(prev => prev.filter(conn => conn.id !== connectionId))
+      
+      // Add to undo stack
+      addToUndoStack({ type: 'DELETE_CONNECTION', connection: connectionToDelete })
     } catch (error) {
       console.error('Error deleting connection:', error)
     }
@@ -176,21 +369,35 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     const card = cards.find(c => c.id === active.id)
     if (!card) return
 
+    // Store old position for undo
+    const oldPosition = { x: card.x, y: card.y }
+
     // Calculate new position and ensure it stays within reasonable bounds
     let newX = card.x + delta.x
     let newY = card.y + delta.y
 
-    // Prevent cards from going behind the sidebar (256px wide w-64 class)
-    // Cards should not be positioned with negative x values since they're within the canvas area
-    newX = Math.max(0, newX)
-    newY = Math.max(0, newY)
+    // Calculate the current viewport bounds relative to the panned canvas
+    const viewportLeft = -panOffset.x
+    const viewportTop = -panOffset.y
+    const viewportRight = viewportLeft + window.innerWidth
+    const viewportBottom = viewportTop + window.innerHeight
 
-    // Also prevent cards from being dragged too far to the right/bottom
-    // This helps prevent them from getting lost off-screen
-    const maxX = window.innerWidth + card.width / 2
-    const maxY = window.innerHeight + card.height / 2
-    newX = Math.min(maxX, newX)
-    newY = Math.min(maxY, newY)
+    // Allow cards to be positioned within a much larger area around the current viewport
+    // This gives users freedom to organize cards in a large workspace
+    const bufferSize = 2000 // 2000px buffer around viewport
+    const minX = viewportLeft - bufferSize
+    const minY = viewportTop - bufferSize
+    const maxX = viewportRight + bufferSize
+    const maxY = viewportBottom + bufferSize
+
+    // Apply the constraints
+    newX = Math.max(minX, Math.min(maxX, newX))
+    newY = Math.max(minY, Math.min(maxY, newY))
+
+    // Apply snap to grid if enabled
+    const snappedCoords = snapToGridCoordinates(newX, newY)
+    newX = snappedCoords.x
+    newY = snappedCoords.y
 
     const updatedCard = {
       ...card,
@@ -204,18 +411,117 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     
     // Then update database in background
     updateCardInDatabase(updatedCard)
+
+    // Add to undo stack if position actually changed
+    if (oldPosition.x !== newX || oldPosition.y !== newY) {
+      addToUndoStack({ 
+        type: 'MOVE_CARD', 
+        cardId: card.id, 
+        oldPosition, 
+        newPosition: { x: newX, y: newY } 
+      })
+    }
+  }
+
+  // SIMPLE reset function - ALWAYS 1 grid square from workspace viewport edges
+  const resetViewToShowContent = () => {
+    if (cards.length === 0) {
+      // No cards, just reset to workspace viewport origin + 1 grid box
+      const gridMargin = gridSize * 1 // 20px
+      setPanOffset({ x: gridMargin, y: gridMargin })
+      return
+    }
+
+    // Calculate bounding box of all cards
+    const minX = Math.min(...cards.map(card => card.x))
+    const minY = Math.min(...cards.map(card => card.y))
+
+    // Grid margin (1 square = 20px) from workspace viewport edges
+    const gridMargin = gridSize * 1 // 20px
+    
+    // Position with exactly 1 grid square from workspace viewport top-left
+    const newPanOffset = {
+      x: gridMargin - minX,
+      y: gridMargin - minY
+    }
+
+    setPanOffset(newPanOffset)
   }
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    if (e.target === e.currentTarget) {
-      if (connectingMode && firstConnectionCard) {
-        // Cancel connection mode
-        setConnectingMode(false)
-        setFirstConnectionCard(null)
-      } else {
-        setSelectedCardId(null)
-      }
+    // Only handle clicks on the background, not on cards or other elements
+    const target = e.target as HTMLElement
+    if (
+      target.closest('.absolute') && target.closest('[style*="left"]') || // Cards
+      target.closest('button') || // Buttons
+      target.closest('input') || // Inputs
+      target.closest('svg') || // Connection lines
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'SVG'
+    ) {
+      return
     }
+
+    // Always save cards when clicking background, regardless of panning state
+    setTimeout(() => {
+      setForceFinishEditingTimestamp(Date.now())
+    }, 0)
+    
+    if (connectingMode && firstConnectionCard) {
+      // Cancel connection mode
+      setConnectingMode(false)
+      setFirstConnectionCard(null)
+    } else {
+      setSelectedCardId(null)
+    }
+  }
+
+  // Panning handlers - IMPROVED FOR FULL GRID DRAGGING
+  const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Only start panning on left mouse button
+    if (e.button === 0) {
+      const target = e.target as HTMLElement
+      
+      // Don't start panning if clicking on cards, buttons, or other interactive elements
+      if (
+        target.closest('.absolute') && target.closest('[style*="left"]') || // Cards
+        target.closest('button') || // Buttons
+        target.closest('input') || // Inputs
+        target.closest('svg') || // Connection lines
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'SVG'
+      ) {
+        return
+      }
+      
+      e.preventDefault()
+      e.stopPropagation()
+      setIsPanning(true)
+      setPanStart({ x: e.clientX - panOffset.x, y: e.clientY - panOffset.y })
+    }
+  }
+
+  const handleCanvasMouseMove = (e: React.MouseEvent) => {
+    if (isPanning) {
+      e.preventDefault()
+      e.stopPropagation()
+      const newPanOffset = {
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y
+      }
+      setPanOffset(newPanOffset)
+    }
+  }
+
+  const handleCanvasMouseUp = () => {
+    setIsPanning(false)
+  }
+
+  // Also handle mouse leave to stop panning if mouse exits canvas
+  const handleCanvasMouseLeave = () => {
+    setIsPanning(false)
   }
 
   const handleCardSelect = (cardId: string) => {
@@ -237,6 +543,8 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     x: card.x + card.width / 2,
     y: card.y + card.height / 2,
   })
+
+
 
   // Helper function to get connection points at card edges
   const getCardConnectionPoints = (fromCard: CardType, toCard: CardType) => {
@@ -335,6 +643,65 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
             </button>
           )}
           
+          {/* Undo Button */}
+          <button
+            onClick={performUndo}
+            disabled={undoStack.length === 0}
+            className={`flex items-center gap-2 px-3 py-2 rounded ${
+              undoStack.length === 0
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+            }`}
+            title={`Undo (${undoStack.length} actions available)`}
+          >
+            <Undo size={16} />
+            Undo
+          </button>
+          
+          {/* Grid Controls */}
+          <div className="flex items-center gap-3 ml-4 border-l border-gray-300 pl-4">
+            <button
+              onClick={() => setGridEnabled(!gridEnabled)}
+              className={`flex items-center gap-2 px-3 py-2 rounded ${
+                gridEnabled 
+                  ? 'bg-purple-500 text-white hover:bg-purple-600' 
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+              title="Toggle Grid"
+            >
+              <Grid3X3 size={16} />
+              Grid
+            </button>
+            
+            {/* Snap to Grid Toggle */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Snap:</span>
+              <button
+                onClick={() => setSnapToGrid(!snapToGrid)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 ${
+                  snapToGrid ? 'bg-purple-600' : 'bg-gray-200'
+                }`}
+                title="Toggle Snap to Grid"
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    snapToGrid ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+
+            {/* Reset Button */}
+            <button
+              onClick={resetViewToShowContent}
+              className="flex items-center gap-2 px-3 py-2 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+              title="Reset View - Show all cards with optimal positioning"
+            >
+              <RotateCcw size={16} />
+              Reset
+            </button>
+          </div>
+          
           {/* Connection status */}
           {connectingMode && (
             <div className="ml-4 bg-orange-100 border border-orange-200 rounded-lg px-3 py-2">
@@ -358,8 +725,22 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
         </div>
       </div>
 
-      {/* Scrollable Canvas Area */}
-      <div className="flex-1 overflow-auto bg-gray-50">
+      {/* Scrollable Canvas Area - ENTIRE AREA DRAGGABLE */}
+      <div 
+        className={`flex-1 overflow-hidden bg-gray-50 relative ${isPanning ? 'cursor-grabbing' : 'cursor-grab'}`}
+        style={{
+          backgroundImage: gridEnabled ? 
+            `linear-gradient(to right, #d1d5db 1px, transparent 1px), linear-gradient(to bottom, #d1d5db 1px, transparent 1px)` : 
+            'none',
+          backgroundSize: gridEnabled ? `${gridSize}px ${gridSize}px` : 'auto',
+          backgroundPosition: gridEnabled ? `${panOffset.x % gridSize}px ${panOffset.y % gridSize}px` : 'auto',
+        }}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseLeave}
+        onClick={handleCanvasClick}
+      >
         <DndContext
           sensors={sensors}  
           onDragStart={handleDragStart}
@@ -367,18 +748,15 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
           onDragCancel={handleDragCancel}
           collisionDetection={rectIntersection}
         >
-          <div 
-            className="relative cursor-default"
+          {/* SVG for connections - OUTSIDE the transformed div */}
+          <svg 
+            className="absolute top-0 left-0 pointer-events-none"
             style={{ 
-              minWidth: '100%', 
-              minHeight: '100%',
-              width: 'max-content',
-              height: 'max-content'
+              width: '100%', 
+              height: '100%',
+              zIndex: 5
             }}
-            onClick={handleCanvasClick}
           >
-          {/* SVG for connections */}
-          <svg className="absolute top-0 left-0 w-full h-full pointer-events-none z-0">
             {connections.map(connection => {
               const fromCard = cards.find(c => c.id === connection.fromCardId)
               const toCard = cards.find(c => c.id === connection.toCardId)
@@ -387,14 +765,24 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
               
               const { from, to } = getCardConnectionPoints(fromCard, toCard)
               
+              // Apply pan offset to connection coordinates
+              const adjustedFrom = {
+                x: from.x + panOffset.x,
+                y: from.y + panOffset.y
+              }
+              const adjustedTo = {
+                x: to.x + panOffset.x,
+                y: to.y + panOffset.y
+              }
+              
               return (
                 <g key={connection.id} className="group">
                   {/* Invisible thick line for easier clicking */}
                   <line
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
+                    x1={adjustedFrom.x}
+                    y1={adjustedFrom.y}
+                    x2={adjustedTo.x}
+                    y2={adjustedTo.y}
                     stroke="transparent"
                     strokeWidth="12"
                     className="pointer-events-auto cursor-pointer"
@@ -405,10 +793,10 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
                   />
                   {/* Visible connection line */}
                   <line
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
+                    x1={adjustedFrom.x}
+                    y1={adjustedFrom.y}
+                    x2={adjustedTo.x}
+                    y2={adjustedTo.y}
                     stroke="#6B7280"
                     strokeWidth="2"
                     markerEnd="url(#arrowhead)"
@@ -416,10 +804,10 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
                   />
                   {/* Hover indicator line */}
                   <line
-                    x1={from.x}
-                    y1={from.y}
-                    x2={to.x}
-                    y2={to.y}
+                    x1={adjustedFrom.x}
+                    y1={adjustedFrom.y}
+                    x2={adjustedTo.x}
+                    y2={adjustedTo.y}
                     stroke="#ef4444"
                     strokeWidth="3"
                     markerEnd="url(#arrowhead-red)"
@@ -460,16 +848,32 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
             </defs>
           </svg>
 
+          <div 
+            className="relative pointer-events-none"
+            style={{ 
+              minWidth: '300vw', 
+              minHeight: '300vh',
+              width: '300vw',
+              height: '300vh',
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              zIndex: 10
+            }}
+          >
           {/* Cards */}
           {cards.map(card => (
-            <Card
-              key={card.id}
-              card={card}
-              onUpdate={updateCard}
-              onDelete={deleteCard}
-              onSelect={handleCardSelect}
-              isSelected={selectedCardId === card.id || firstConnectionCard === card.id}
-            />
+            <div key={card.id} style={{ pointerEvents: 'auto' }}>
+              <Card
+                card={card}
+                onUpdate={updateCard}
+                onDelete={deleteCard}
+                onSelect={handleCardSelect}
+                isSelected={selectedCardId === card.id || firstConnectionCard === card.id}
+                snapToGrid={snapToGrid}
+                gridSize={gridSize}
+                forceFinishEditingTimestamp={forceFinishEditingTimestamp}
+                connectingMode={connectingMode}
+              />
+            </div>
           ))}
         </div>
         
