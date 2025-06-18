@@ -45,23 +45,23 @@ Configure the following OAuth providers in your `.env.local`:
 2. Create a new project or select existing
 3. Enable Google+ API
 4. Create OAuth 2.0 credentials
-5. Add `http://localhost:3000/api/auth/callback/google` to authorized redirect URIs
+5. Add `http://0.0.0.0:3000/api/auth/callback/google` to authorized redirect URIs
 
 #### GitHub OAuth
 1. Go to GitHub Settings → Developer settings → OAuth Apps
 2. Create a new OAuth App
-3. Authorization callback URL: `http://localhost:3000/api/auth/callback/github`
+3. Authorization callback URL: `http://0.0.0.0:3000/api/auth/callback/github`
 
 #### Microsoft OAuth
 1. Go to [Azure App Registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps)
 2. Create a new registration
-3. Add redirect URI: `http://localhost:3000/api/auth/callback/microsoft`
+3. Add redirect URI: `http://0.0.0.0:3000/api/auth/callback/microsoft`
 
 #### Apple OAuth
 1. Go to [Apple Developer Console](https://developer.apple.com/)
 2. Create a new App ID and Service ID
 3. Configure Sign in with Apple
-4. Add redirect URI: `http://localhost:3000/api/auth/callback/apple`
+4. Add redirect URI: `http://0.0.0.0:3000/api/auth/callback/apple`
 
 ### 3. Run Development Server
 
@@ -69,7 +69,7 @@ Configure the following OAuth providers in your `.env.local`:
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Open [http://0.0.0.0:3000](http://0.0.0.0:3000) in your browser.
 
 ## Usage
 
