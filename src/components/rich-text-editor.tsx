@@ -7,7 +7,7 @@ import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
 import Code from '@tiptap/extension-code'
 import { useEffect } from 'react'
-import { Bold, Italic, List, ListOrdered, Quote, Undo, Redo } from 'lucide-react'
+import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo } from 'lucide-react'
 
 interface RichTextEditorProps {
   content: string
@@ -60,9 +60,9 @@ export default function RichTextEditor({
   }
 
   return (
-    <div className={`rich-text-editor border border-gray-200 rounded-lg ${className}`}>
+    <div className={`rich-text-editor border border-gray-200 rounded-lg flex flex-col h-full ${className}`}>
       {/* Toolbar */}
-      <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg">
+      <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg flex-shrink-0">
         <button
           onClick={() => editor.chain().focus().toggleBold().run()}
           className={`p-2 rounded hover:bg-gray-200 text-black ${
@@ -81,6 +81,16 @@ export default function RichTextEditor({
           title="Italic"
         >
           <Italic size={16} strokeWidth={2} className="text-black" />
+        </button>
+        
+        <button
+          onClick={() => editor.chain().focus().toggleStrike().run()}
+          className={`p-2 rounded hover:bg-gray-200 text-black ${
+            editor.isActive('strike') ? 'bg-gray-300' : ''
+          }`}
+          title="Strikethrough"
+        >
+          <Strikethrough size={16} strokeWidth={2} className="text-black" />
         </button>
         
         <button
@@ -147,7 +157,9 @@ export default function RichTextEditor({
       </div>
       
       {/* Editor Content */}
-      <EditorContent editor={editor} />
+      <div className="overflow-auto flex-1 min-h-0">
+        <EditorContent editor={editor} />
+      </div>
     </div>
   )
 }

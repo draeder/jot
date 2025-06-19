@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import WorkspaceSelector from './workspace-selector'
 import WorkspaceCanvas from './workspace-canvas'
@@ -11,6 +11,21 @@ import { v4 as uuidv4 } from 'uuid'
 export default function Dashboard() {
   const { data: session } = useSession()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
+  const workspaceCanvasRef = useRef<{ resetView: () => void } | null>(null)
+
+  // Handle workspace selection with implied reset
+  const handleWorkspaceSelect = (workspaceId: string) => {
+    const previousWorkspaceId = selectedWorkspaceId
+    setSelectedWorkspaceId(workspaceId)
+    
+    // If we're switching to a different workspace, trigger reset after a brief delay
+    // to allow the new workspace to load
+    if (previousWorkspaceId !== workspaceId && previousWorkspaceId !== null) {
+      setTimeout(() => {
+        workspaceCanvasRef.current?.resetView()
+      }, 100)
+    }
+  }
 
   // Create user in IndexedDB when they first sign in
   useEffect(() => {
@@ -21,7 +36,7 @@ export default function Dashboard() {
           
           if (!existingUser) {
             // Create new user with email as ID if no ID is provided
-            const userId = (session.user as any).id || session.user.email || uuidv4()
+            const userId = (session.user as { id?: string }).id || session.user.email || uuidv4()
             await db.users.add({
               id: userId,
               email: session.user.email,
@@ -96,14 +111,16 @@ export default function Dashboard() {
       <div className="flex-1 flex overflow-hidden min-h-0">
         <WorkspaceSelector
           selectedWorkspaceId={selectedWorkspaceId}
-          onWorkspaceSelect={setSelectedWorkspaceId}
+          onWorkspaceSelect={handleWorkspaceSelect}
         />
         
         <div className="flex-1 flex flex-col min-w-0">
           {selectedWorkspaceId ? (
             <>
-              {console.log('🏠 Rendering WorkspaceCanvas for workspace:', selectedWorkspaceId)}
-              <WorkspaceCanvas workspaceId={selectedWorkspaceId} />
+              <WorkspaceCanvas 
+                ref={workspaceCanvasRef}
+                workspaceId={selectedWorkspaceId} 
+              />
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center bg-gray-50">
@@ -129,23 +146,5 @@ export default function Dashboard() {
         </div>
       </div>
     </div>
-  )
-}
-
-function FolderOpen({ size = 24, className = '' }) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="m6 14 1.45-2.9A2 2 0 0 1 9.24 10H20a2 2 0 0 1 1.73 3l-1.5 3a2 2 0 0 1-1.73 1H4a2 2 0 0 1-2-2V5c0-1.1.9-2 2-2h3.93a2 2 0 0 1 1.66.9l.82 1.2a2 2 0 0 0 1.66.9H18a2 2 0 0 1 2 2v2" />
-    </svg>
   )
 }

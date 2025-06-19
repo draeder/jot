@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { Card as CardType } from '@/lib/db'
 import RichTextEditor from './rich-text-editor'
 import { GripVertical, X, Edit2 } from 'lucide-react'
@@ -103,9 +103,9 @@ export default function Card({
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
     }
-  }, [isResizing, card, onUpdate, snapToGrid, gridSize])
+  }, [isResizing, card, onUpdate, snapToGrid, gridSize, snapToGridDimensions])
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     onUpdate({
       ...card,
       title,
@@ -113,7 +113,7 @@ export default function Card({
       updatedAt: new Date(),
     })
     setIsEditing(false)
-  }
+  }, [card, title, content, onUpdate])
 
   const handleCancel = () => {
     setTitle(card.title)
@@ -126,7 +126,7 @@ export default function Card({
     if (forceFinishEditingTimestamp > 0 && isEditing) {
       handleSave()
     }
-  }, [forceFinishEditingTimestamp])
+  }, [forceFinishEditingTimestamp, handleSave, isEditing])
 
   return (
     <div
@@ -229,7 +229,7 @@ export default function Card({
           />
         ) : (
           <div 
-            className={`prose prose-sm max-w-none h-full overflow-y-auto hover:bg-gray-50 ${
+            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 ${
               connectingMode ? 'cursor-crosshair' : 'cursor-pointer'
             }`}
             onClick={(e) => {

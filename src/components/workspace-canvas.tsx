@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, DragCancelEvent, useSensor, useSensors, PointerSensor, rectIntersection } from '@dnd-kit/core'
+import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react'
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, rectIntersection } from '@dnd-kit/core'
 import { Card as CardType, Connection, db } from '@/lib/db'
 import Card from './card'
 import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo, Redo, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
@@ -20,7 +20,12 @@ interface WorkspaceCanvasProps {
   workspaceId: string
 }
 
-export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
+// Interface for imperative handle
+export interface WorkspaceCanvasHandle {
+  resetView: () => void
+}
+
+const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(({ workspaceId }, ref) => {
   const [cards, setCards] = useState<CardType[]>([])
   const [connections, setConnections] = useState<Connection[]>([])
   const [selectedCardId, setSelectedCardId] = useState<string | null>(null)
@@ -59,6 +64,52 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   // Grid settings
   const gridSize = 20 // 20px grid
 
+  // RESET function - ALWAYS positions to Page 1,1 (top-left cards at 1 grid box margin)
+  const resetViewToShowContent = useCallback(() => {
+    const gridMargin = gridSize * 1 // 20px
+    
+    if (cards.length === 0) {
+      // No cards, just reset to Page 1,1 position
+      setPanOffset({ x: gridMargin, y: gridMargin })
+      return
+    }
+
+    // Find the absolute top-left cards (Page 1,1)
+    const minX = Math.min(...cards.map(card => card.x))
+    const minY = Math.min(...cards.map(card => card.y))
+    
+    // Debug logging
+    console.log('🔍 RESET DEBUG:')
+    console.log('  gridMargin:', gridMargin)
+    console.log('  minX (leftmost card x):', minX)
+    console.log('  minY (topmost card y):', minY)
+    console.log('  Required panOffset.x:', gridMargin - minX)
+    console.log('  Required panOffset.y:', gridMargin - minY)
+    
+    // To position the leftmost card at gridMargin (20px) from the left edge:
+    // We need: minX + panOffset.x = gridMargin
+    // Therefore: panOffset.x = gridMargin - minX
+    const newPanOffset = {
+      x: gridMargin - minX,
+      y: gridMargin - minY
+    }
+
+    setPanOffset(newPanOffset)
+    
+    // Verify positioning after a brief delay
+    setTimeout(() => {
+      console.log('🔍 POST-RESET DEBUG:')
+      console.log('  panOffset after reset:', newPanOffset)
+      console.log('  Expected leftmost card screen position: minX + panOffset.x =', minX + newPanOffset.x)
+      console.log('  Should equal gridMargin (20px):', gridMargin)
+    }, 100)
+  }, [cards, gridSize])
+
+  // Expose reset function to parent component
+  useImperativeHandle(ref, () => ({
+    resetView: resetViewToShowContent
+  }), [resetViewToShowContent])
+
   // Paging state
   const [pageIndicators, setPageIndicators] = useState<{
     left: boolean
@@ -82,7 +133,7 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   }, [snapToGrid])
 
   // Simple rule: if ANY card is outside viewport, show directional indicator
-  const calculatePageIndicators = useCallback(() => {
+  useEffect(() => {
     if (typeof window === 'undefined' || cards.length === 0) {
       setPageIndicators({ left: false, right: false, up: false, down: false })
       return
@@ -118,17 +169,47 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     setPageIndicators({ left: hasLeft, right: hasRight, up: hasUp, down: hasDown })
   }, [cards, panOffset])
 
-  // Update page indicators when cards or pan offset changes
-  useEffect(() => {
-    calculatePageIndicators()
-  }, [calculatePageIndicators])
-
   // Also recalculate on window resize
   useEffect(() => {
-    const handleResize = () => calculatePageIndicators()
+    const handleResize = () => {
+      if (typeof window === 'undefined' || cards.length === 0) {
+        setPageIndicators({ left: false, right: false, up: false, down: false })
+        return
+      }
+
+      // Account for the toolbar height and sidebar width
+      const toolbarHeight = 80
+      const sidebarWidth = 256 // w-64 = 256px
+      const canvasWidth = window.innerWidth - sidebarWidth
+      const canvasHeight = window.innerHeight - toolbarHeight
+
+      const viewportLeft = -panOffset.x
+      const viewportRight = -panOffset.x + canvasWidth
+      const viewportTop = -panOffset.y
+      const viewportBottom = -panOffset.y + canvasHeight
+
+      let hasLeft = false
+      let hasRight = false
+      let hasUp = false
+      let hasDown = false
+
+      cards.forEach(card => {
+        // Card is off-screen left if its right edge is left of viewport
+        if (card.x + card.width < viewportLeft) hasLeft = true
+        // Card is off-screen right if its left edge is right of viewport
+        if (card.x > viewportRight) hasRight = true
+        // Card is off-screen up if its bottom edge is above viewport
+        if (card.y + card.height < viewportTop) hasUp = true
+        // Card is off-screen down if its top edge is below viewport
+        if (card.y > viewportBottom) hasDown = true
+      })
+
+      setPageIndicators({ left: hasLeft, right: hasRight, up: hasUp, down: hasDown })
+    }
+    
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [calculatePageIndicators])
+  }, [cards, panOffset])
 
   // Helper function to add action to undo stack
   const addToUndoStack = (action: UndoAction) => {
@@ -343,29 +424,154 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
   }
 
   const createCard = async (x?: number, y?: number) => {
-    let cardX = x
-    let cardY = y
+    let cardX: number = x ?? 0
+    let cardY: number = y ?? 0
     
-    // If no specific position provided, place at current viewport top-left (no additional margin)
-    if (cardX === undefined || cardY === undefined) {
-      const viewportLeft = -panOffset.x
-      const viewportTop = -panOffset.y
+    // If no specific position provided, place new card in upper left of current viewport
+    if (x === undefined || y === undefined) {
+      const gridMargin = gridSize * 1 // 20px margin
       
-      // Position at viewport top-left (reset/navigation already handles margins)
-      cardX = viewportLeft
-      cardY = viewportTop
+      // Always place new cards at top-left of current viewport with margin
+      // Convert viewport position to world coordinates
+      cardX = -panOffset.x + gridMargin
+      cardY = -panOffset.y + gridMargin
+      
+      console.log('🎯 NEW CARD POSITIONING:')
+      console.log('  panOffset:', panOffset)
+      console.log('  viewport top-left in world coords:', { x: -panOffset.x, y: -panOffset.y })
+      console.log('  card position with margin:', { x: cardX, y: cardY })
     }
     
     // Apply snap to grid if enabled
     const snappedCoords = snapToGridCoordinates(cardX, cardY)
+    cardX = snappedCoords.x
+    cardY = snappedCoords.y
+    
+    // Smart collision detection - only cascade if there's direct overlap
+    const newCardBounds = {
+      left: cardX,
+      right: cardX + 350, // default card width
+      top: cardY,
+      bottom: cardY + 280 // default card height
+    }
+    
+    // Check for direct overlap with existing cards
+    const hasOverlap = cards.some(existingCard => {
+      const existingBounds = {
+        left: existingCard.x,
+        right: existingCard.x + existingCard.width,
+        top: existingCard.y,
+        bottom: existingCard.y + existingCard.height
+      }
+      
+      // Check if rectangles overlap
+      const overlaps = !(
+        newCardBounds.right <= existingBounds.left ||   // new card is to the left
+        newCardBounds.left >= existingBounds.right ||   // new card is to the right
+        newCardBounds.bottom <= existingBounds.top ||   // new card is above
+        newCardBounds.top >= existingBounds.bottom      // new card is below
+      )
+      
+      return overlaps
+    })
+    
+    // If there's overlap, cascade to find a free position
+    if (hasOverlap) {
+      console.log('🔄 COLLISION DETECTED - Finding free position...')
+      
+      const cascadeOffset = gridSize * 2 // 40px cascade offset
+      let attempts = 0
+      const maxAttempts = 20
+      
+      while (attempts < maxAttempts) {
+        // Try positions in a spiral pattern
+        const spiralOffsets = [
+          { x: cascadeOffset, y: cascadeOffset },
+          { x: cascadeOffset * 2, y: cascadeOffset },
+          { x: cascadeOffset, y: cascadeOffset * 2 },
+          { x: cascadeOffset * 2, y: cascadeOffset * 2 },
+          { x: cascadeOffset * 3, y: cascadeOffset },
+          { x: cascadeOffset, y: cascadeOffset * 3 },
+          { x: cascadeOffset * 3, y: cascadeOffset * 3 },
+        ]
+        
+        for (const offset of spiralOffsets) {
+          const testX: number = cardX + offset.x
+          const testY: number = cardY + offset.y
+          
+          const testBounds = {
+            left: testX,
+            right: testX + 350,
+            top: testY,
+            bottom: testY + 280
+          }
+          
+          // Check if this position overlaps with any existing card
+          const testOverlaps = cards.some(existingCard => {
+            const existingBounds = {
+              left: existingCard.x,
+              right: existingCard.x + existingCard.width,
+              top: existingCard.y,
+              bottom: existingCard.y + existingCard.height
+            }
+            
+            return !(
+              testBounds.right <= existingBounds.left ||
+              testBounds.left >= existingBounds.right ||
+              testBounds.bottom <= existingBounds.top ||
+              testBounds.top >= existingBounds.bottom
+            )
+          })
+          
+          if (!testOverlaps) {
+            cardX = testX
+            cardY = testY
+            console.log('✅ Found free position:', { x: cardX, y: cardY })
+            break
+          }
+        }
+        
+        attempts++
+        if (!cards.some(existingCard => {
+          const existingBounds = {
+            left: existingCard.x,
+            right: existingCard.x + existingCard.width,
+            top: existingCard.y,
+            bottom: existingCard.y + existingCard.height
+          }
+          
+          const currentBounds = {
+            left: cardX,
+            right: cardX + 350,
+            top: cardY,
+            bottom: cardY + 280
+          }
+          
+          return !(
+            currentBounds.right <= existingBounds.left ||
+            currentBounds.left >= existingBounds.right ||
+            currentBounds.bottom <= existingBounds.top ||
+            currentBounds.top >= existingBounds.bottom
+          )
+        })) {
+          break // Found a free position
+        }
+      }
+      
+      if (attempts >= maxAttempts) {
+        console.log('⚠️ Could not find free position after', maxAttempts, 'attempts')
+      }
+    } else {
+      console.log('✅ No collision detected - placing at original position')
+    }
     
     const newCard: CardType = {
       id: uuidv4(),
       workspaceId,
       title: 'New Card',
       content: '',
-      x: snappedCoords.x,
-      y: snappedCoords.y,
+      x: cardX,
+      y: cardY,
       width: 350,
       height: 280,
       createdAt: new Date(),
@@ -570,47 +776,6 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     }
   }
 
-  // RESET function - ALWAYS positions to Page 1,1 (top-left cards at 1 grid box margin)
-  const resetViewToShowContent = () => {
-    const gridMargin = gridSize * 1 // 20px
-    
-    if (cards.length === 0) {
-      // No cards, just reset to Page 1,1 position
-      setPanOffset({ x: gridMargin, y: gridMargin })
-      return
-    }
-
-    // Find the absolute top-left cards (Page 1,1)
-    const minX = Math.min(...cards.map(card => card.x))
-    const minY = Math.min(...cards.map(card => card.y))
-    
-    // Debug logging
-    console.log('🔍 RESET DEBUG:')
-    console.log('  gridMargin:', gridMargin)
-    console.log('  minX (leftmost card x):', minX)
-    console.log('  minY (topmost card y):', minY)
-    console.log('  Required panOffset.x:', gridMargin - minX)
-    console.log('  Required panOffset.y:', gridMargin - minY)
-    
-    // To position the leftmost card at gridMargin (20px) from the left edge:
-    // We need: minX + panOffset.x = gridMargin
-    // Therefore: panOffset.x = gridMargin - minX
-    const newPanOffset = {
-      x: gridMargin - minX,
-      y: gridMargin - minY
-    }
-
-    setPanOffset(newPanOffset)
-    
-    // Verify positioning after a brief delay
-    setTimeout(() => {
-      console.log('🔍 POST-RESET DEBUG:')
-      console.log('  panOffset after reset:', newPanOffset)
-      console.log('  Expected leftmost card screen position: minX + panOffset.x =', minX + newPanOffset.x)
-      console.log('  Should equal gridMargin (20px):', gridMargin)
-    }, 100)
-  }
-
   // Paging navigation functions
   const navigateToDirection = (direction: 'left' | 'right' | 'up' | 'down') => {
     if (typeof window === 'undefined' || cards.length === 0) return
@@ -629,7 +794,7 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
     const viewportBottom = -panOffset.y + viewportHeight
 
     // Find cards in the specified direction
-    let targetCards: CardType[] = []
+    const targetCards: CardType[] = []
 
     cards.forEach(card => {
       const cardLeft = card.x
@@ -1258,4 +1423,8 @@ export default function WorkspaceCanvas({ workspaceId }: WorkspaceCanvasProps) {
       </div>
     </div>
   )
-}
+})
+
+WorkspaceCanvas.displayName = 'WorkspaceCanvas'
+
+export default WorkspaceCanvas

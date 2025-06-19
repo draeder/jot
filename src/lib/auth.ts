@@ -3,7 +3,7 @@ import GitHubProvider from 'next-auth/providers/github'
 import AzureADProvider from 'next-auth/providers/azure-ad'
 import AppleProvider from 'next-auth/providers/apple'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { db } from './db'
+// import { db } from './db'
 import { v4 as uuidv4 } from 'uuid'
 
 interface SignInCallbackParams {
@@ -82,7 +82,7 @@ export const authOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account }: SignInCallbackParams) {
+    async signIn({ user }: SignInCallbackParams) {
       // Simply return true for all valid sign-ins
       // User creation will be handled on the client side
       return !!(user.email);
