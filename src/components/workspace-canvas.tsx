@@ -904,32 +904,22 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   }
 
   const handleCanvasClick = (e: React.MouseEvent) => {
-    // Only handle clicks on the background, not on cards or other elements
     const target = e.target as HTMLElement
-    if (
-      target.closest('.absolute') && target.closest('[style*="left"]') || // Cards
-      target.closest('button') || // Buttons
-      target.closest('input') || // Inputs
-      target.closest('svg') || // Connection lines
-      target.tagName === 'BUTTON' ||
-      target.tagName === 'INPUT' ||
-      target.tagName === 'SVG'
-    ) {
+    
+    // If click is inside a card, do nothing (let card handle it)
+    if (target.closest('[data-card-id]')) {
       return
     }
-
-    // Always save cards when clicking background, regardless of panning state
-    setTimeout(() => {
-      setForceFinishEditingTimestamp(Date.now())
-    }, 0)
     
+    // Click outside all cards - save/finish editing
     if (connectingMode && firstConnectionCard) {
-      // Cancel connection mode
       setConnectingMode(false)
       setFirstConnectionCard(null)
     } else {
       setSelectedCardId(null)
     }
+    
+    setForceFinishEditingTimestamp(Date.now())
   }
 
   // Panning handlers - IMPROVED FOR FULL GRID DRAGGING
@@ -940,13 +930,20 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
       
       // Don't start panning if clicking on cards, buttons, or other interactive elements
       if (
-        target.closest('.absolute') && target.closest('[style*="left"]') || // Cards
+        target.closest('[data-card-id]') || // Cards (using data attribute)
+        target.closest('.prose') || // Card content areas
         target.closest('button') || // Buttons
         target.closest('input') || // Inputs
+        target.closest('textarea') || // Text areas
         target.closest('svg') || // Connection lines
         target.tagName === 'BUTTON' ||
         target.tagName === 'INPUT' ||
-        target.tagName === 'SVG'
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SVG' ||
+        // Check if the click is inside any card-related element
+        target.classList.contains('prose') ||
+        target.closest('.ql-editor') || // Quill editor
+        target.closest('.rich-text-editor') // Rich text editor
       ) {
         return
       }

@@ -1,0 +1,8 @@
+name = "jot"
+compatibility_date = "2024-01-01"
+
+[env.production]
+name = "jot"
+
+[[env.production.vars]]
+NODE_ENV = "production"

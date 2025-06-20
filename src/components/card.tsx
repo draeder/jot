@@ -30,20 +30,26 @@ export default function Card({
   connectingMode = false
 }: CardProps) {
   const [isEditing, setIsEditing] = useState(false)
+  const [lastEditingStartTime, setLastEditingStartTime] = useState(0)
+  
+  // Debug isEditing state changes
+  useEffect(() => {
+    console.log(`Card ${card.id} isEditing changed to:`, isEditing)
+  }, [isEditing, card.id])
   const [title, setTitle] = useState(card.title)
   const [content, setContent] = useState(card.content)
   const [isResizing, setIsResizing] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   // Snap dimensions to grid
-  const snapToGridDimensions = (width: number, height: number) => {
+  const snapToGridDimensions = useCallback((width: number, height: number) => {
     if (!snapToGrid) return { width, height }
     
     return {
       width: Math.round(width / gridSize) * gridSize,
       height: Math.round(height / gridSize) * gridSize
     }
-  }
+  }, [snapToGrid, gridSize])
 
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: card.id,
@@ -106,6 +112,7 @@ export default function Card({
   }, [isResizing, card, onUpdate, snapToGrid, gridSize, snapToGridDimensions])
 
   const handleSave = useCallback(() => {
+    console.log('handleSave called, setting isEditing to false')
     onUpdate({
       ...card,
       title,
@@ -116,6 +123,7 @@ export default function Card({
   }, [card, title, content, onUpdate])
 
   const handleCancel = () => {
+    console.log('handleCancel called, setting isEditing to false')
     setTitle(card.title)
     setContent(card.content)
     setIsEditing(false)
@@ -124,9 +132,16 @@ export default function Card({
   // Effect to handle forced finish editing from parent
   useEffect(() => {
     if (forceFinishEditingTimestamp > 0 && isEditing) {
+      // Ignore force finish if we just started editing (within 100ms)
+      const timeSinceEditingStarted = Date.now() - lastEditingStartTime
+      if (timeSinceEditingStarted < 100) {
+        console.log('Ignoring force finish editing - just started editing')
+        return
+      }
+      console.log('Force finish editing triggered')
       handleSave()
     }
-  }, [forceFinishEditingTimestamp, handleSave, isEditing])
+  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime])
 
   return (
     <div
@@ -144,9 +159,13 @@ export default function Card({
       } ${isDragging ? 'opacity-50' : ''} ${
         connectingMode ? 'hover:border-orange-400 hover:shadow-orange-200' : ''
       }`}
+      data-card-id={card.id}
       onClick={(e) => {
         e.stopPropagation()
         onSelect(card.id)
+      }}
+      onMouseDown={(e) => {
+        e.stopPropagation()
       }}
     >
       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -196,7 +215,10 @@ export default function Card({
             <>
               <button
                 onClick={(e) => {
+                  console.log('Edit button clicked!')
                   e.stopPropagation()
+                  console.log('Setting isEditing to true')
+                  setLastEditingStartTime(Date.now())
                   setIsEditing(true)
                 }}
                 className="p-1 text-gray-600 hover:bg-gray-100 rounded"
@@ -233,13 +255,22 @@ export default function Card({
               connectingMode ? 'cursor-crosshair' : 'cursor-pointer'
             }`}
             onClick={(e) => {
+              console.log('Content area clicked!', { connectingMode, isEditing })
+              console.log('Event target:', e.target)
+              console.log('Current target:', e.currentTarget)
               e.stopPropagation()
+              e.preventDefault()
               // If in connecting mode, prioritize connection over editing
               if (connectingMode) {
                 onSelect(card.id)
               } else {
+                console.log('Setting isEditing to true from content click')
+                setLastEditingStartTime(Date.now())
                 setIsEditing(true)
               }
+            }}
+            onMouseDown={(e) => {
+              e.stopPropagation()
             }}
             dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click to add content...</p>' }}
           />

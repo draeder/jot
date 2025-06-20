@@ -67,21 +67,21 @@ resource "cloudflare_pages_project" "jot" {
     web_analytics_token = var.web_analytics_token
   }
 
-  # NOTE: Source configuration commented out - add GitHub integration manually via dashboard
-  # source {
-  #   type = "github"
-  #   config {
-  #     owner                         = var.github_owner
-  #     repo_name                    = var.github_repo
-  #     production_branch            = "main"
-  #     pr_comments_enabled          = true
-  #     deployments_enabled          = true
-  #     production_deployment_enabled = true
-  #     preview_deployment_setting   = "custom"
-  #     preview_branch_includes      = ["*"]
-  #     preview_branch_excludes      = ["main"]
-  #   }
-  # }
+  # GitHub source configuration
+  source {
+    type = "github"
+    config {
+      owner                         = var.github_owner
+      repo_name                    = var.github_repo
+      production_branch            = "main"
+      pr_comments_enabled          = true
+      deployments_enabled          = true
+      production_deployment_enabled = true
+      preview_deployment_setting   = "custom"
+      preview_branch_includes      = ["*"]
+      preview_branch_excludes      = ["main"]
+    }
+  }
 
   deployment_configs {
     preview {
@@ -115,7 +115,7 @@ resource "cloudflare_record" "jot_cname" {
   count   = var.custom_domain != "" && var.zone_id != "" ? 1 : 0
   zone_id = var.zone_id
   name    = var.custom_domain
-  content = "${var.project_name}.pages.dev"
+  content = cloudflare_pages_project.jot.subdomain
   type    = "CNAME"
   proxied = true
 }
@@ -126,21 +126,23 @@ resource "time_sleep" "wait_for_pages" {
   create_duration = "30s"
 }
 
-# Page rules for better performance and security
-resource "cloudflare_page_rule" "jot_security" {
-  count    = var.zone_id != "" ? 1 : 0
-  zone_id  = var.zone_id
-  target   = "${var.custom_domain != "" ? var.custom_domain : "${var.project_name}.pages.dev"}/*"
-  priority = 1
+# Note: Page rules have been commented out due to conflicts with existing rules
+# If you need to manage page rules, please first remove any existing ones from Cloudflare dashboard
+# Then uncomment and modify the rules below as needed
 
-  actions {
-    security_level = "medium"
-    ssl           = "strict"
-    always_use_https = true
-  }
-
-  depends_on = [time_sleep.wait_for_pages]
-}
+# Page rule for HTTPS redirect (most important for security)
+# resource "cloudflare_page_rule" "jot_security" {
+#   count    = var.zone_id != "" ? 1 : 0
+#   zone_id  = var.zone_id
+#   target   = "${var.custom_domain != "" ? var.custom_domain : "${var.project_name}.pages.dev"}/*"
+#   priority = 1
+#
+#   actions {
+#     always_use_https = true
+#   }
+#
+#   depends_on = [time_sleep.wait_for_pages]
+# }
 
 # Bot protection using modern ruleset (replaces deprecated filter/firewall_rule)
 resource "cloudflare_ruleset" "jot_bot_protection" {

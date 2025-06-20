@@ -5,7 +5,6 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
-import Code from '@tiptap/extension-code'
 import { useEffect } from 'react'
 import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo } from 'lucide-react'
 
@@ -27,8 +26,8 @@ export default function RichTextEditor({
       StarterKit.configure({
         // Disable code block with syntax highlighting but keep other features
         codeBlock: false,
+        // Code is already included in StarterKit
       }),
-      Code, // Keep inline code
       Placeholder.configure({
         placeholder,
       }),
@@ -39,6 +38,7 @@ export default function RichTextEditor({
       }),
     ],
     content,
+    immediatelyRender: false, // Fix SSR hydration issues
     onUpdate: ({ editor }) => {
       onChange(editor.getHTML())
     },
