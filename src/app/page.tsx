@@ -2,23 +2,33 @@
 
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import Dashboard from '@/components/dashboard'
 
 export default function Home() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const [forceRedirect, setForceRedirect] = useState(false)
 
   useEffect(() => {
     console.log('Session status:', status, 'Session:', session)
-    if (status === 'loading') return // Still loading
-    if (!session) {
-      console.log('No session, redirecting to signin')
+    if (status === 'loading') {
+      // Set a timeout to prevent infinite loading
+      const timeout = setTimeout(() => {
+        console.log('Session loading timeout - forcing redirect to signin')
+        setForceRedirect(true)
+      }, 10000) // 10 seconds timeout
+      
+      return () => clearTimeout(timeout)
+    }
+    
+    if (!session || forceRedirect) {
+      console.log('No session or forced redirect, redirecting to signin')
       router.push('/auth/signin')
     }
-  }, [session, status, router])
+  }, [session, status, router, forceRedirect])
 
-  if (status === 'loading') {
+  if (status === 'loading' && !forceRedirect) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
@@ -30,7 +40,7 @@ export default function Home() {
     )
   }
 
-  if (!session) {
+  if (!session || forceRedirect) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
