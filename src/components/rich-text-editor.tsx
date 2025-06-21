@@ -51,13 +51,15 @@ interface RichTextEditorProps {
   onChange: (content: string) => void
   placeholder?: string
   className?: string
+  onUserActivity?: () => void
 }
 
 export default function RichTextEditor({ 
   content, 
   onChange, 
   placeholder = 'Start typing...', 
-  className = '' 
+  className = '',
+  onUserActivity
 }: RichTextEditorProps) {
   const editor = useEditor({
     extensions: [
@@ -177,7 +179,12 @@ export default function RichTextEditor({
       {/* Toolbar */}
       <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg flex-shrink-0">
         <button
-          onClick={() => editor.chain().focus().toggleBold().run()}
+          onClick={() => {
+            onUserActivity?.()
+            editor.chain().focus().toggleBold().run()
+          }}
+          onMouseEnter={() => onUserActivity?.()}
+          onMouseDown={() => onUserActivity?.()}
           className={`p-2 rounded hover:bg-gray-200 text-black ${
             editor.isActive('bold') ? 'bg-gray-300' : ''
           }`}
@@ -187,7 +194,12 @@ export default function RichTextEditor({
         </button>
         
         <button
-          onClick={() => editor.chain().focus().toggleItalic().run()}
+          onClick={() => {
+            onUserActivity?.()
+            editor.chain().focus().toggleItalic().run()
+          }}
+          onMouseEnter={() => onUserActivity?.()}
+          onMouseDown={() => onUserActivity?.()}
           className={`p-2 rounded hover:bg-gray-200 text-black ${
             editor.isActive('italic') ? 'bg-gray-300' : ''
           }`}
@@ -229,7 +241,12 @@ export default function RichTextEditor({
         </button>
         
         <button
-          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          onClick={() => {
+            onUserActivity?.()
+            editor.chain().focus().toggleCodeBlock().run()
+          }}
+          onMouseEnter={() => onUserActivity?.()}
+          onMouseDown={() => onUserActivity?.()}
           className={`p-2 rounded hover:bg-gray-200 text-black ${
             editor.isActive('codeBlock') ? 'bg-gray-300' : ''
           }`}

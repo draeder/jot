@@ -335,6 +335,9 @@ export default function Card({
                 setContent(newContent)
                 setLastUserActivityTime(Date.now())
               }}
+              onUserActivity={() => {
+                setLastUserActivityTime(Date.now())
+              }}
               placeholder="Write your note here..."
               className="flex-1"
             />
