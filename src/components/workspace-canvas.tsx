@@ -994,6 +994,52 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     setIsPanning(false)
   }
 
+  // Handle double-click to create card at pointer location
+  const handleCanvasDoubleClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement
+    
+    // Don't create card if double-clicking on existing cards or interactive elements
+    if (
+      target.closest('[data-card-id]') || // Cards (using data attribute)
+      target.closest('.prose') || // Card content areas
+      target.closest('button') || // Buttons
+      target.closest('input') || // Inputs
+      target.closest('textarea') || // Text areas
+      target.closest('svg') || // Connection lines
+      target.tagName === 'BUTTON' ||
+      target.tagName === 'INPUT' ||
+      target.tagName === 'TEXTAREA' ||
+      target.tagName === 'SVG' ||
+      target.classList.contains('prose') ||
+      target.closest('.ql-editor') || // Quill editor
+      target.closest('.rich-text-editor') // Rich text editor
+    ) {
+      return
+    }
+
+    e.preventDefault()
+    e.stopPropagation()
+
+    // Get the canvas container bounds
+    const canvasRect = e.currentTarget.getBoundingClientRect()
+    
+    // Calculate the click position relative to the canvas
+    const clickX = e.clientX - canvasRect.left
+    const clickY = e.clientY - canvasRect.top
+    
+    // Convert to world coordinates by accounting for pan offset
+    const worldX = clickX - panOffset.x
+    const worldY = clickY - panOffset.y
+    
+    console.log('🎯 DOUBLE-CLICK CREATE CARD:')
+    console.log('  Click position:', { clickX, clickY })
+    console.log('  Pan offset:', panOffset)
+    console.log('  World coordinates:', { worldX, worldY })
+    
+    // Create card at the clicked position
+    createCard(worldX, worldY)
+  }
+
   const handleCardSelect = (cardId: string) => {
     if (connectingMode) {
       if (!firstConnectionCard) {
@@ -1231,6 +1277,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
         onMouseUp={handleCanvasMouseUp}
         onMouseLeave={handleCanvasMouseLeave}
         onClick={handleCanvasClick}
+        onDoubleClick={handleCanvasDoubleClick}
       >
         {/* Paging Indicators */}
         {pageIndicators.left && (
