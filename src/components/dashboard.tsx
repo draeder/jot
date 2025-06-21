@@ -37,7 +37,7 @@ export default function Dashboard() {
           if (!existingUser) {
             // Create new user with email as ID if no ID is provided
             const userId = (session.user as { id?: string }).id || session.user.email || uuidv4()
-            await db.users.add({
+            const newUser = {
               id: userId,
               email: session.user.email,
               name: session.user.name || '',
@@ -45,8 +45,23 @@ export default function Dashboard() {
               provider: 'unknown', // We don't have provider info on client side
               createdAt: new Date(),
               updatedAt: new Date(),
-            })
+            }
+            
+            await db.users.add(newUser)
             console.log('User created in IndexedDB:', session.user.email)
+            
+            // Create a default workspace for new users
+            const defaultWorkspace = {
+              id: uuidv4(),
+              name: 'My First Workspace',
+              userId: userId,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            }
+            
+            await db.workspaces.add(defaultWorkspace)
+            console.log('Default workspace created for new user:', defaultWorkspace.id)
+            setSelectedWorkspaceId(defaultWorkspace.id)
           }
         } catch (error) {
           console.error('Error creating user in IndexedDB:', error)
