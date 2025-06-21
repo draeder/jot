@@ -76,6 +76,9 @@ export default function Card({
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || !cardRef.current) return
 
+      // Update user activity time to prevent forced finish editing during resize
+      setLastUserActivityTime(Date.now())
+
       const rect = cardRef.current.getBoundingClientRect()
       let newWidth = e.clientX - rect.left
       let newHeight = e.clientY - rect.top
@@ -364,6 +367,7 @@ export default function Card({
         }}
         onMouseDown={(e) => {
           e.preventDefault()
+          setLastUserActivityTime(Date.now()) // Update activity time when starting resize
           setIsResizing(true)
         }}
       />

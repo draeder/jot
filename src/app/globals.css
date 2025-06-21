@@ -211,6 +211,16 @@
   font-size: inherit !important;
 }
 
+/* Image styling in editor */
+.ProseMirror .editor-image {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 6px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+}
+
 /* Display mode code styling */
 .card-content code {
   background-color: #f6f8fa !important;
@@ -220,6 +230,26 @@
   font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
   font-size: 0.9em !important;
   color: #e36209 !important;
+}
+
+/* Image styling in display mode */
+.card-content .editor-image,
+.card-content img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 6px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  cursor: pointer !important;
+}
+
+.prose .editor-image,
+.prose img {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 6px !important;
+  margin: 8px 0 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
 }
 
 .card-content .code-block {

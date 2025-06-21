@@ -6,9 +6,10 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
+import Image from '@tiptap/extension-image'
 import { createLowlight } from 'lowlight'
 import { useEffect } from 'react'
-import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode } from 'lucide-react'
+import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode, ImageIcon } from 'lucide-react'
 
 // Import common language syntaxes
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -34,6 +35,16 @@ lowlight.register('css', css)
 lowlight.register('json', json)
 lowlight.register('bash', bash)
 lowlight.register('sql', sql)
+
+// Helper function to convert image file to base64 data URL
+const fileToBase64 = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result as string)
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
 
 interface RichTextEditorProps {
   content: string
@@ -83,6 +94,13 @@ export default function RichTextEditor({
         className: 'has-focus',
         mode: 'all',
       }),
+      Image.configure({
+        inline: false,
+        allowBase64: true,
+        HTMLAttributes: {
+          class: 'editor-image',
+        },
+      }),
     ],
     content,
     immediatelyRender: false, // Fix SSR hydration issues
@@ -108,6 +126,29 @@ export default function RichTextEditor({
         }
         
         return false // Let TipTap handle the event normally
+      },
+      handlePaste: (view, event) => {
+        event.stopPropagation()
+        
+        // Handle image paste
+        const files = event.clipboardData?.files
+        if (files && files.length > 0) {
+          const imageFiles = Array.from(files).filter(file => file.type.startsWith('image/'))
+          if (imageFiles.length > 0) {
+            event.preventDefault()
+            imageFiles.forEach(async (file) => {
+              try {
+                const base64 = await fileToBase64(file)
+                editor?.chain().focus().setImage({ src: base64 }).run()
+              } catch (error) {
+                console.error('Error converting image to base64:', error)
+              }
+            })
+            return true
+          }
+        }
+        
+        return false // Let TipTap handle other paste events normally
       },
     },
   })
@@ -250,6 +291,30 @@ export default function RichTextEditor({
           <Quote size={16} strokeWidth={2} className="text-black" />
         </button>
         
+        <button
+          onClick={() => {
+            const input = document.createElement('input')
+            input.type = 'file'
+            input.accept = 'image/*'
+            input.onchange = async (e) => {
+              const file = (e.target as HTMLInputElement).files?.[0]
+              if (file) {
+                try {
+                  const base64 = await fileToBase64(file)
+                  editor.chain().focus().setImage({ src: base64 }).run()
+                } catch (error) {
+                  console.error('Error converting image to base64:', error)
+                }
+              }
+            }
+            input.click()
+          }}
+          className="p-2 rounded hover:bg-gray-200 text-black"
+          title="Insert Image"
+        >
+          <ImageIcon size={16} strokeWidth={2} className="text-black" />
+        </button>
+        
         <div className="w-px h-6 bg-gray-300 mx-1" />
         
         <button
@@ -268,6 +333,14 @@ export default function RichTextEditor({
           title="Redo"
         >
           <Redo size={16} strokeWidth={2} className={editor.can().redo() ? "text-black" : "text-gray-400"} />
+        </button>
+        
+        <button
+          onClick={() => editor.chain().focus().setImage({ src: 'https://via.placeholder.com/150' }).run()}
+          className="p-2 rounded hover:bg-gray-200 text-black"
+          title="Image"
+        >
+          <ImageIcon size={16} strokeWidth={2} className="text-black" />
         </button>
       </div>
       
