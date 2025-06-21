@@ -73,6 +73,7 @@ export default function RichTextEditor({
           class: 'code-block',
         },
         languageClassPrefix: 'language-',
+        exitOnTripleEnter: false,
       }),
       Placeholder.configure({
         placeholder,

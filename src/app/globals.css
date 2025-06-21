@@ -1,7 +1,92 @@
 @import "tailwindcss";
 
-/* Import highlight.js theme for syntax highlighting */
-@import 'highlight.js/styles/github.css';
+/* WORKING SYNTAX HIGHLIGHTING - DIRECT CSS */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #24292e;
+  background: #ffffff;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6a737d;
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #d73a49;
+  font-weight: bold;
+}
+
+.hljs-string,
+.hljs-doctag {
+  color: #032f62;
+}
+
+.hljs-title,
+.hljs-section,
+.hljs-selector-id {
+  color: #6f42c1;
+  font-weight: bold;
+}
+
+.hljs-subst {
+  color: #24292e;
+}
+
+.hljs-type,
+.hljs-class .hljs-title {
+  color: #005cc5;
+  font-weight: bold;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-attribute {
+  color: #005cc5;
+}
+
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link {
+  color: #005cc5;
+}
+
+.hljs-meta,
+.hljs-selector-attr,
+.hljs-selector-pseudo {
+  color: #6f42c1;
+}
+
+.hljs-regexp {
+  color: #032f62;
+}
+
+.hljs-addition {
+  color: #22863a;
+  background-color: #f0fff4;
+}
+
+.hljs-deletion {
+  color: #b31d28;
+  background-color: #ffeef0;
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+.hljs-strong {
+  font-weight: bold;
+}
 
 /* Rich Text Editor Styles */
 .ProseMirror {
@@ -122,7 +207,6 @@
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
-  color: inherit !important;
   font-family: inherit !important;
   font-size: inherit !important;
 }
@@ -164,7 +248,6 @@
   background: transparent !important;
   border: none !important;
   padding: 0 !important;
-  color: inherit !important;
   font-family: inherit !important;
   font-size: inherit !important;
 }
@@ -328,6 +411,94 @@
 .prose code {
   color: #000000 !important;
   background-color: #f3f4f6 !important;
+}
+
+/* CRITICAL: Apply EXACT same highlight.js styles to card display as in edit mode */
+.card-content .hljs-keyword,
+.card-content .hljs-selector-tag,
+.card-content .hljs-built_in,
+.card-content .hljs-name,
+.card-content .hljs-tag {
+  color: #d73a49 !important;
+  font-weight: bold !important;
+}
+
+.card-content .hljs-string,
+.card-content .hljs-doctag {
+  color: #032f62 !important;
+}
+
+.card-content .hljs-comment,
+.card-content .hljs-quote {
+  color: #6a737d !important;
+  font-style: italic !important;
+}
+
+.card-content .hljs-number,
+.card-content .hljs-literal,
+.card-content .hljs-variable,
+.card-content .hljs-template-variable,
+.card-content .hljs-attribute {
+  color: #005cc5 !important;
+}
+
+.card-content .hljs-title,
+.card-content .hljs-section,
+.card-content .hljs-selector-id,
+.card-content .hljs-type,
+.card-content .hljs-class .hljs-title {
+  color: #6f42c1 !important;
+  font-weight: bold !important;
+}
+
+.card-content .hljs-meta,
+.card-content .hljs-selector-attr,
+.card-content .hljs-selector-pseudo {
+  color: #6f42c1 !important;
+}
+
+.card-content .hljs-symbol,
+.card-content .hljs-bullet,
+.card-content .hljs-link {
+  color: #005cc5 !important;
+}
+
+.card-content .hljs-regexp {
+  color: #032f62 !important;
+}
+
+.card-content .hljs-addition {
+  color: #22863a !important;
+  background-color: #f0fff4 !important;
+}
+
+.card-content .hljs-deletion {
+  color: #b31d28 !important;
+  background-color: #ffeef0 !important;
+}
+
+.card-content .hljs-emphasis {
+  font-style: italic !important;
+}
+
+.card-content .hljs-strong {
+  font-weight: bold !important;
+}
+
+.card-content .hljs-function {
+  color: #6f42c1 !important;
+}
+
+.card-content .hljs-params {
+  color: #24292e !important;
+}
+
+.card-content .hljs-selector-class {
+  color: #6f42c1 !important;
+}
+
+.card-content .hljs-subst {
+  color: #24292e !important;
 }
 
 :root {

@@ -58,7 +58,7 @@ export default function Card({
       type: 'card',
       card,
     },
-    disabled: isResizing || isEditing, // Disable dragging when resizing or editing
+    disabled: isResizing, // Only disable dragging when resizing, allow dragging while editing
   })
 
   // During dragging, use transform for positioning. Otherwise use left/top
