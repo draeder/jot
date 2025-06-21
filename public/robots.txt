@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Sitemap
+Sitemap: https://jot-ooo-c032f6516eeb.herokuapp.com/sitemap.xml
+
+# Allow all crawlers access to CSS and JS files
+User-agent: *
+Allow: /_next/static/
+Allow: /favicon.ico
+Allow: /jotlogo.png
+Allow: /manifest.json
