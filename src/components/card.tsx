@@ -137,6 +137,12 @@ export default function Card({
   // Effect to handle forced finish editing from parent
   useEffect(() => {
     if (forceFinishEditingTimestamp > 0 && isEditing) {
+      // Ignore force finish if the card is currently being dragged
+      if (isDragging) {
+        console.log('Ignoring force finish editing - card is being dragged')
+        return
+      }
+
       // Ignore force finish if we just started editing (within 200ms to be more generous)
       const timeSinceEditingStarted = Date.now() - lastEditingStartTime
       
@@ -169,7 +175,7 @@ export default function Card({
       })
       handleSave()
     }
-  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime, lastUserActivityTime])
+  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime, lastUserActivityTime, isDragging])
 
   return (
     <div
@@ -217,14 +223,11 @@ export default function Card({
               onKeyDown={(e) => {
                 e.stopPropagation()
                 setLastUserActivityTime(Date.now())
-                // Allow ENTER to submit/save when editing title
-                if (e.key === 'Enter') {
-                  handleSave()
-                }
                 // Allow ESC to cancel
                 if (e.key === 'Escape') {
                   handleCancel()
                 }
+                // Note: Removed Enter key save behavior - users should use save button or click outside
               }}
               onKeyUp={(e) => {
                 e.stopPropagation()
@@ -239,7 +242,16 @@ export default function Card({
               autoFocus
             />
           ) : (
-            <h3 className="flex-1 font-medium text-sm text-gray-900 truncate">
+            <h3 
+              className="flex-1 font-medium text-sm text-gray-900 truncate cursor-pointer hover:bg-gray-100 rounded px-2 py-1 transition-colors"
+              onClick={(e) => {
+                console.log('Title clicked - entering edit mode')
+                e.stopPropagation()
+                setLastEditingStartTime(Date.now())
+                setIsEditing(true)
+              }}
+              title="Click to edit title"
+            >
               {card.title || 'Untitled Card'}
             </h3>
           )}

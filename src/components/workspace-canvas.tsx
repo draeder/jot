@@ -450,9 +450,9 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     // Smart collision detection - only cascade if there's direct overlap
     const newCardBounds = {
       left: cardX,
-      right: cardX + 350, // default card width
+      right: cardX + 450, // default card width - increased for better editor space
       top: cardY,
-      bottom: cardY + 280 // default card height
+      bottom: cardY + 350 // default card height - increased for full editor visibility
     }
     
     // Check for direct overlap with existing cards
@@ -501,9 +501,9 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
           
           const testBounds = {
             left: testX,
-            right: testX + 350,
+            right: testX + 450,
             top: testY,
-            bottom: testY + 280
+            bottom: testY + 350
           }
           
           // Check if this position overlaps with any existing card
@@ -542,9 +542,9 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
           
           const currentBounds = {
             left: cardX,
-            right: cardX + 350,
+            right: cardX + 450,
             top: cardY,
-            bottom: cardY + 280
+            bottom: cardY + 350
           }
           
           return !(
@@ -572,8 +572,8 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
       content: '',
       x: cardX,
       y: cardY,
-      width: 350,
-      height: 280,
+      width: 450,
+      height: 350,
       createdAt: new Date(),
       updatedAt: new Date(),
     }
