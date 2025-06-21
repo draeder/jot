@@ -45,17 +45,26 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
   }
 
   const loadWorkspaces = useCallback(async () => {
-    if (!session?.user?.email) return
+    if (!session?.user?.email) {
+      console.log('No session or email available for loading workspaces')
+      return
+    }
 
     try {
       // First get the user ID from the database
       const dbUser = await db.users.where('email').equals(session.user.email).first()
-      if (!dbUser) return
+      if (!dbUser) {
+        console.log('No user found in database for email:', session.user.email)
+        return
+      }
 
+      console.log('Loading workspaces for user:', dbUser.id)
       const userWorkspaces = await db.workspaces
         .where('userId')
         .equals(dbUser.id)
         .toArray()
+      
+      console.log('Found workspaces:', userWorkspaces.length)
       
       // Sort by updatedAt in descending order (newest first)
       userWorkspaces.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
@@ -64,6 +73,7 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
       
       // Auto-select first workspace if none selected
       if (!selectedWorkspaceId && userWorkspaces.length > 0) {
+        console.log('Auto-selecting first workspace:', userWorkspaces[0].id)
         onWorkspaceSelect(userWorkspaces[0].id)
       }
     } catch (error) {
