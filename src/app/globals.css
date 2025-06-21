@@ -219,6 +219,20 @@
   margin: 8px 0 !important;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
   cursor: pointer !important;
+  min-width: 100px !important;
+  min-height: 100px !important;
+}
+
+/* Image selected state with resize handles */
+.ProseMirror .editor-image.ProseMirror-selectednode {
+  outline: 2px solid #3b82f6 !important;
+  outline-offset: 2px !important;
+  position: relative !important;
+}
+
+/* Add resize handle styling for images */
+.ProseMirror .editor-image:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
 }
 
 /* Display mode code styling */

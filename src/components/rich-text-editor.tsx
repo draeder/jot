@@ -6,7 +6,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
-import Image from '@tiptap/extension-image'
+import ResizableImage from 'tiptap-extension-resize-image'
 import { createLowlight } from 'lowlight'
 import { useEffect } from 'react'
 import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode, ImageIcon } from 'lucide-react'
@@ -94,7 +94,7 @@ export default function RichTextEditor({
         className: 'has-focus',
         mode: 'all',
       }),
-      Image.configure({
+      ResizableImage.configure({
         inline: false,
         allowBase64: true,
         HTMLAttributes: {
