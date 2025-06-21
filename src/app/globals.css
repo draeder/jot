@@ -32,6 +32,26 @@
   margin: 0.5em 0;
 }
 
+/* Ensure paragraph spacing is preserved in card content display */
+.prose p {
+  margin: 0.5em 0 !important;
+}
+
+/* Ensure hard breaks are visible */
+.prose .hard-break {
+  display: block;
+  margin: 0.25em 0;
+}
+
+/* Fix prose paragraph spacing specifically for card content */
+.card-content p {
+  margin-bottom: 0.5em !important;
+}
+
+.card-content p:last-child {
+  margin-bottom: 0 !important;
+}
+
 .ProseMirror h1,
 .ProseMirror h2, 
 .ProseMirror h3,

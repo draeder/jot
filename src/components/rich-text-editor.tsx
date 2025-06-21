@@ -26,7 +26,17 @@ export default function RichTextEditor({
       StarterKit.configure({
         // Disable code block with syntax highlighting but keep other features
         codeBlock: false,
-        // Code is already included in StarterKit
+        // Ensure proper paragraph and hard break handling
+        paragraph: {
+          HTMLAttributes: {
+            class: 'mb-2', // Add some margin between paragraphs
+          },
+        },
+        hardBreak: {
+          HTMLAttributes: {
+            class: 'hard-break',
+          },
+        },
       }),
       Placeholder.configure({
         placeholder,
@@ -40,7 +50,9 @@ export default function RichTextEditor({
     content,
     immediatelyRender: false, // Fix SSR hydration issues
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML())
+      const html = editor.getHTML()
+      console.log('TipTap HTML output:', html)
+      onChange(html)
     },
     editorProps: {
       attributes: {
@@ -49,6 +61,13 @@ export default function RichTextEditor({
       handleKeyDown: (view, event) => {
         // Stop all keyboard events from bubbling up
         event.stopPropagation()
+        
+        // Handle Shift+Enter for hard breaks
+        if (event.key === 'Enter' && event.shiftKey) {
+          // Let TipTap handle Shift+Enter for hard breaks
+          return false
+        }
+        
         return false // Let TipTap handle the event normally
       },
     },

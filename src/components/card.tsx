@@ -114,6 +114,7 @@ export default function Card({
 
   const handleSave = useCallback(() => {
     console.log('handleSave called, setting isEditing to false')
+    console.log('Saving content:', { title, content })
     onUpdate({
       ...card,
       title,
@@ -320,13 +321,14 @@ export default function Card({
           </div>
         ) : (
           <div 
-            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 ${
+            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 card-content ${
               connectingMode ? 'cursor-crosshair' : 'cursor-pointer'
             }`}
             onClick={(e) => {
               console.log('Content area clicked!', { connectingMode, isEditing })
               console.log('Event target:', e.target)
               console.log('Current target:', e.currentTarget)
+              console.log('Card content HTML:', card.content)
               e.stopPropagation()
               e.preventDefault()
               // If in connecting mode, prioritize connection over editing
