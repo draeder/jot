@@ -34,11 +34,29 @@ const providerOrder = ['local', 'google', 'apple', 'github', 'azure-ad']
 export default function SignIn() {
   const [providers, setProviders] = useState<Record<string, Provider> | null>(null)
   const [localName, setLocalName] = useState('')
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchProviders = async () => {
-      const res = await getProviders()
-      setProviders(res)
+      try {
+        const res = await getProviders()
+        console.log('Providers loaded:', res)
+        setProviders(res)
+      } catch (error) {
+        console.error('Error loading providers:', error)
+        // Fallback: set a default local provider if API fails
+        setProviders({
+          local: {
+            id: 'local',
+            name: 'Local-only',
+            type: 'credentials',
+            signinUrl: '/api/auth/signin/local',
+            callbackUrl: '/api/auth/callback/local'
+          }
+        })
+      } finally {
+        setLoading(false)
+      }
     }
     fetchProviders()
   }, [])
@@ -70,49 +88,79 @@ export default function SignIn() {
         </div>
 
         <div className="space-y-4">
-          {providers &&
-            providerOrder
-              .map(providerId => providers[providerId])
-              .filter(Boolean)
-              .map((provider) => {
-                const Icon = providerIcons[provider.id as keyof typeof providerIcons]
-                const colorClass = providerColors[provider.id as keyof typeof providerColors]
+          {loading ? (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+              <p className="mt-2 text-gray-600">Loading sign-in options...</p>
+            </div>
+          ) : (
+            <>
+              {providers &&
+                providerOrder
+                  .map(providerId => providers[providerId])
+                  .filter(Boolean)
+                  .map((provider) => {
+                    const Icon = providerIcons[provider.id as keyof typeof providerIcons]
+                    const colorClass = providerColors[provider.id as keyof typeof providerColors]
 
-                // Handle local provider with form
-                if (provider.id === 'local') {
-                  return (
-                    <form key={provider.id} onSubmit={handleLocalSignIn} className="space-y-3">
-                      <input
-                        type="text"
-                        value={localName}
-                        onChange={(e) => setLocalName(e.target.value)}
-                        placeholder="Enter your name"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                        required
-                      />
+                    // Handle local provider with form
+                    if (provider.id === 'local') {
+                      return (
+                        <form key={provider.id} onSubmit={handleLocalSignIn} className="space-y-3">
+                          <input
+                            type="text"
+                            value={localName}
+                            onChange={(e) => setLocalName(e.target.value)}
+                            placeholder="Enter your name"
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                            required
+                          />
+                          <button
+                            type="submit"
+                            className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition-colors ${colorClass}`}
+                          >
+                            {Icon && <Icon size={20} />}
+                            Sign in with {provider.name}
+                          </button>
+                        </form>
+                      )
+                    }
+
+                    // Handle OAuth providers
+                    return (
                       <button
-                        type="submit"
+                        key={provider.name}
+                        onClick={() => signIn(provider.id, { callbackUrl: '/' })}
                         className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition-colors ${colorClass}`}
                       >
                         {Icon && <Icon size={20} />}
                         Sign in with {provider.name}
                       </button>
-                    </form>
-                  )
-                }
-
-                // Handle OAuth providers
-                return (
+                    )
+                  })}
+              
+              {/* Fallback local login if no providers load */}
+              {!providers && (
+                <form onSubmit={handleLocalSignIn} className="space-y-3">
+                  <input
+                    type="text"
+                    value={localName}
+                    onChange={(e) => setLocalName(e.target.value)}
+                    placeholder="Enter your name"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    required
+                  />
                   <button
-                    key={provider.name}
-                    onClick={() => signIn(provider.id, { callbackUrl: '/' })}
-                    className={`w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition-colors ${colorClass}`}
+                    type="submit"
+                    className="w-full flex items-center justify-center gap-3 px-4 py-3 rounded-lg text-white font-medium transition-colors bg-green-500 hover:bg-green-600"
                   >
-                    {Icon && <Icon size={20} />}
-                    Sign in with {provider.name}
+                    <User size={20} />
+                    Sign in with Local-only
                   </button>
-                )
-              })}
+                </form>
+              )}
+            </>
+          )}
         </div>
 
         <div className="mt-8 text-center text-sm text-gray-500">
