@@ -292,6 +292,11 @@ export default function Card({
       <div className="flex-1 p-2 overflow-hidden">
         {isEditing ? (
           <div
+            style={{ 
+              height: 'calc(100% - 20px)', // Account for padding
+              display: 'flex',
+              flexDirection: 'column'
+            }}
             onKeyDown={(e) => {
               e.stopPropagation()
               setLastUserActivityTime(Date.now())
@@ -316,7 +321,7 @@ export default function Card({
                 setLastUserActivityTime(Date.now())
               }}
               placeholder="Write your note here..."
-              className="flex-1 min-h-0 h-full"
+              className="flex-1"
             />
           </div>
         ) : (

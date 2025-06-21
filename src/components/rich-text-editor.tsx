@@ -29,10 +29,11 @@ export default function RichTextEditor({
         // Ensure proper paragraph and hard break handling
         paragraph: {
           HTMLAttributes: {
-            class: 'mb-2', // Add some margin between paragraphs
+            class: 'paragraph-spacing', // Custom class for paragraph spacing
           },
         },
         hardBreak: {
+          keepMarks: false,
           HTMLAttributes: {
             class: 'hard-break',
           },
@@ -52,11 +53,13 @@ export default function RichTextEditor({
     onUpdate: ({ editor }) => {
       const html = editor.getHTML()
       console.log('TipTap HTML output:', html)
+      console.log('TipTap JSON output:', editor.getJSON())
       onChange(html)
     },
     editorProps: {
       attributes: {
-        class: 'prose prose-sm max-w-none focus:outline-none min-h-[100px] p-3',
+        class: 'prose prose-sm max-w-none focus:outline-none p-3 editor-content',
+        style: 'height: 100%; min-height: 100px; overflow-y: auto;',
       },
       handleKeyDown: (view, event) => {
         // Stop all keyboard events from bubbling up
@@ -85,13 +88,14 @@ export default function RichTextEditor({
 
   return (
     <div 
-      className={`rich-text-editor border border-gray-200 rounded-lg flex flex-col h-full ${className}`}
+      className={`rich-text-editor border border-gray-200 rounded-lg flex flex-col ${className}`}
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onMouseUp={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.stopPropagation()}
       onKeyUp={(e) => e.stopPropagation()}
       onKeyPress={(e) => e.stopPropagation()}
+      style={{ height: '100%', minHeight: '200px' }}
     >
       {/* Toolbar */}
       <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg flex-shrink-0">
@@ -190,7 +194,11 @@ export default function RichTextEditor({
       
       {/* Editor Content */}
       <div 
-        className="overflow-auto flex-1 min-h-0"
+        className="flex-1 min-h-0"
+        style={{ 
+          height: 'calc(100% - 60px)', // Account for toolbar height
+          overflow: 'hidden'
+        }}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
@@ -198,7 +206,12 @@ export default function RichTextEditor({
         onKeyUp={(e) => e.stopPropagation()}
         onKeyPress={(e) => e.stopPropagation()}
       >
-        <EditorContent editor={editor} />
+        <div style={{ height: '100%', overflow: 'auto' }}>
+          <EditorContent 
+            editor={editor} 
+            style={{ height: '100%', minHeight: '100px' }}
+          />
+        </div>
       </div>
     </div>
   )

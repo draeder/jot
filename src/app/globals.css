@@ -4,13 +4,22 @@
 .ProseMirror {
   outline: none !important;
   line-height: 1.6;
-  padding: 0;
+  padding: 12px !important;
   margin: 0;
   font-size: 14px;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   caret-color: #000000 !important;
   cursor: text;
   color: #000000 !important;
+  min-height: 100px !important;
+  height: 100% !important;
+  overflow-y: auto !important;
+}
+
+/* Ensure proper editor content styling */
+.editor-content {
+  height: 100% !important;
+  overflow-y: auto !important;
 }
 
 .ProseMirror:focus {
@@ -29,27 +38,46 @@
 /* Regular text elements - ALL BLACK */
 .ProseMirror p {
   color: #000000 !important;
-  margin: 0.5em 0;
+  margin: 0.75em 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* Specific paragraph spacing class */
+.ProseMirror .paragraph-spacing {
+  margin: 0.75em 0 !important;
+  line-height: 1.5 !important;
 }
 
 /* Ensure paragraph spacing is preserved in card content display */
-.prose p {
-  margin: 0.5em 0 !important;
+.prose p,
+.card-content p {
+  margin: 0.75em 0 !important;
+  line-height: 1.5 !important;
 }
 
 /* Ensure hard breaks are visible */
-.prose .hard-break {
+.prose .hard-break,
+.card-content .hard-break {
   display: block;
   margin: 0.25em 0;
 }
 
 /* Fix prose paragraph spacing specifically for card content */
-.card-content p {
-  margin-bottom: 0.5em !important;
+.card-content .paragraph-spacing {
+  margin-bottom: 0.75em !important;
+  line-height: 1.5 !important;
 }
 
-.card-content p:last-child {
+.card-content p:last-child,
+.card-content .paragraph-spacing:last-child {
   margin-bottom: 0 !important;
+}
+
+/* Ensure empty paragraphs have minimum height */
+.ProseMirror p:empty,
+.card-content p:empty,
+.prose p:empty {
+  min-height: 1.2em;
 }
 
 .ProseMirror h1,
