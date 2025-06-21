@@ -41,6 +41,7 @@ interface JWTCallbackParams {
 }
 
 export const authOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     CredentialsProvider({
       id: 'local',
