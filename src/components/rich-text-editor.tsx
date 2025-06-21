@@ -60,7 +60,12 @@ export default function RichTextEditor({
   }
 
   return (
-    <div className={`rich-text-editor border border-gray-200 rounded-lg flex flex-col h-full ${className}`}>
+    <div 
+      className={`rich-text-editor border border-gray-200 rounded-lg flex flex-col h-full ${className}`}
+      onClick={(e) => e.stopPropagation()}
+      onMouseDown={(e) => e.stopPropagation()}
+      onMouseUp={(e) => e.stopPropagation()}
+    >
       {/* Toolbar */}
       <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg flex-shrink-0">
         <button
@@ -157,7 +162,12 @@ export default function RichTextEditor({
       </div>
       
       {/* Editor Content */}
-      <div className="overflow-auto flex-1 min-h-0">
+      <div 
+        className="overflow-auto flex-1 min-h-0"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        onMouseUp={(e) => e.stopPropagation()}
+      >
         <EditorContent editor={editor} />
       </div>
     </div>

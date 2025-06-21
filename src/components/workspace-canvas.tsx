@@ -906,10 +906,19 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   const handleCanvasClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     
-    // If click is inside a card, do nothing (let card handle it)
-    if (target.closest('[data-card-id]')) {
+    // If click is inside a card or any card-related element, do nothing (let card handle it)
+    if (
+      target.closest('[data-card-id]') || 
+      target.closest('.prose') || 
+      target.hasAttribute('data-card-id') ||
+      // Check if the click is on any element that's part of a card
+      target.closest('div[style*="position: absolute"]')?.hasAttribute('data-card-id')
+    ) {
+      console.log('Click inside card detected, not forcing finish editing')
       return
     }
+    
+    console.log('Click outside cards detected, forcing finish editing')
     
     // Click outside all cards - save/finish editing
     if (connectingMode && firstConnectionCard) {

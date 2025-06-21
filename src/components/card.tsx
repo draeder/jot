@@ -272,6 +272,9 @@ export default function Card({
             onMouseDown={(e) => {
               e.stopPropagation()
             }}
+            onMouseUp={(e) => {
+              e.stopPropagation()
+            }}
             dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click to add content...</p>' }}
           />
         )}
