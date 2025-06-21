@@ -96,7 +96,7 @@ export default function Dashboard() {
               <span>{session.user?.name || session.user?.email}</span>
             </div>
             <button
-              onClick={() => signOut({ callbackUrl: '/auth/signin' })}
+              onClick={() => signOut()}
               className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
               title="Sign Out"
             >
