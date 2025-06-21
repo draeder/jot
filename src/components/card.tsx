@@ -31,6 +31,7 @@ export default function Card({
 }: CardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [lastEditingStartTime, setLastEditingStartTime] = useState(0)
+  const [lastUserActivityTime, setLastUserActivityTime] = useState(0)
   
   // Debug isEditing state changes
   useEffect(() => {
@@ -132,16 +133,39 @@ export default function Card({
   // Effect to handle forced finish editing from parent
   useEffect(() => {
     if (forceFinishEditingTimestamp > 0 && isEditing) {
-      // Ignore force finish if we just started editing (within 100ms)
+      // Ignore force finish if we just started editing (within 200ms to be more generous)
       const timeSinceEditingStarted = Date.now() - lastEditingStartTime
-      if (timeSinceEditingStarted < 100) {
-        console.log('Ignoring force finish editing - just started editing')
+      
+      // Also ignore if there was recent user activity (within 500ms)
+      const timeSinceLastActivity = Date.now() - lastUserActivityTime
+      
+      if (timeSinceEditingStarted < 200) {
+        console.log('Ignoring force finish editing - just started editing', {
+          timeSinceEditingStarted,
+          lastEditingStartTime,
+          forceFinishEditingTimestamp
+        })
         return
       }
-      console.log('Force finish editing triggered')
+      
+      if (timeSinceLastActivity < 500) {
+        console.log('Ignoring force finish editing - recent user activity', {
+          timeSinceLastActivity,
+          lastUserActivityTime,
+          forceFinishEditingTimestamp
+        })
+        return
+      }
+      
+      console.log('Force finish editing triggered', {
+        timeSinceEditingStarted,
+        timeSinceLastActivity,
+        lastEditingStartTime,
+        forceFinishEditingTimestamp
+      })
       handleSave()
     }
-  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime])
+  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime, lastUserActivityTime])
 
   return (
     <div
@@ -182,7 +206,30 @@ export default function Card({
             <input
               type="text"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value)
+                setLastUserActivityTime(Date.now())
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+                // Allow ENTER to submit/save when editing title
+                if (e.key === 'Enter') {
+                  handleSave()
+                }
+                // Allow ESC to cancel
+                if (e.key === 'Escape') {
+                  handleCancel()
+                }
+              }}
+              onKeyUp={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+              }}
+              onKeyPress={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+              }}
               className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
               placeholder="Card title"
               autoFocus
@@ -243,12 +290,34 @@ export default function Card({
 
       <div className="flex-1 p-2 overflow-hidden">
         {isEditing ? (
-          <RichTextEditor
-            content={content}
-            onChange={setContent}
-            placeholder="Write your note here..."
-            className="flex-1 min-h-0 h-full"
-          />
+          <div
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              setLastUserActivityTime(Date.now())
+            }}
+            onKeyUp={(e) => {
+              e.stopPropagation()
+              setLastUserActivityTime(Date.now())
+            }}
+            onKeyPress={(e) => {
+              e.stopPropagation()
+              setLastUserActivityTime(Date.now())
+            }}
+            onClick={(e) => {
+              e.stopPropagation()
+              setLastUserActivityTime(Date.now())
+            }}
+          >
+            <RichTextEditor
+              content={content}
+              onChange={(newContent) => {
+                setContent(newContent)
+                setLastUserActivityTime(Date.now())
+              }}
+              placeholder="Write your note here..."
+              className="flex-1 min-h-0 h-full"
+            />
+          </div>
         ) : (
           <div 
             className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 ${

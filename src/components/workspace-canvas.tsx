@@ -906,6 +906,15 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   const handleCanvasClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
     
+    console.log('Canvas click event:', {
+      type: e.type,
+      target: target.tagName,
+      className: target.className,
+      closest_card: target.closest('[data-card-id]'),
+      closest_prose: target.closest('.prose'),
+      has_data_card_id: target.hasAttribute('data-card-id')
+    })
+    
     // If click is inside a card or any card-related element, do nothing (let card handle it)
     if (
       target.closest('[data-card-id]') || 

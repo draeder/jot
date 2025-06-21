@@ -46,6 +46,11 @@ export default function RichTextEditor({
       attributes: {
         class: 'prose prose-sm max-w-none focus:outline-none min-h-[100px] p-3',
       },
+      handleKeyDown: (view, event) => {
+        // Stop all keyboard events from bubbling up
+        event.stopPropagation()
+        return false // Let TipTap handle the event normally
+      },
     },
   })
 
@@ -65,6 +70,9 @@ export default function RichTextEditor({
       onClick={(e) => e.stopPropagation()}
       onMouseDown={(e) => e.stopPropagation()}
       onMouseUp={(e) => e.stopPropagation()}
+      onKeyDown={(e) => e.stopPropagation()}
+      onKeyUp={(e) => e.stopPropagation()}
+      onKeyPress={(e) => e.stopPropagation()}
     >
       {/* Toolbar */}
       <div className="border-b border-gray-200 p-2 flex items-center gap-1 bg-gray-50 rounded-t-lg flex-shrink-0">
@@ -167,6 +175,9 @@ export default function RichTextEditor({
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onMouseUp={(e) => e.stopPropagation()}
+        onKeyDown={(e) => e.stopPropagation()}
+        onKeyUp={(e) => e.stopPropagation()}
+        onKeyPress={(e) => e.stopPropagation()}
       >
         <EditorContent editor={editor} />
       </div>
