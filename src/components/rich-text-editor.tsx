@@ -2,11 +2,38 @@
 
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
+import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
+import { createLowlight } from 'lowlight'
 import { useEffect } from 'react'
-import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo } from 'lucide-react'
+import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode } from 'lucide-react'
+
+// Import common language syntaxes
+import javascript from 'highlight.js/lib/languages/javascript'
+import typescript from 'highlight.js/lib/languages/typescript'
+import python from 'highlight.js/lib/languages/python'
+import java from 'highlight.js/lib/languages/java'
+import cpp from 'highlight.js/lib/languages/cpp'
+import html from 'highlight.js/lib/languages/xml'
+import css from 'highlight.js/lib/languages/css'
+import json from 'highlight.js/lib/languages/json'
+import bash from 'highlight.js/lib/languages/bash'
+import sql from 'highlight.js/lib/languages/sql'
+
+// Create lowlight instance and register languages
+const lowlight = createLowlight()
+lowlight.register('javascript', javascript)
+lowlight.register('typescript', typescript)
+lowlight.register('python', python)
+lowlight.register('java', java)
+lowlight.register('cpp', cpp)
+lowlight.register('html', html)
+lowlight.register('css', css)
+lowlight.register('json', json)
+lowlight.register('bash', bash)
+lowlight.register('sql', sql)
 
 interface RichTextEditorProps {
   content: string
@@ -24,7 +51,7 @@ export default function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        // Disable code block with syntax highlighting but keep other features
+        // Enable code block but we'll replace it with CodeBlockLowlight
         codeBlock: false,
         // Ensure proper paragraph and hard break handling
         paragraph: {
@@ -38,6 +65,14 @@ export default function RichTextEditor({
             class: 'hard-break',
           },
         },
+      }),
+      CodeBlockLowlight.configure({
+        lowlight,
+        defaultLanguage: 'javascript',
+        HTMLAttributes: {
+          class: 'code-block',
+        },
+        languageClassPrefix: 'language-',
       }),
       Placeholder.configure({
         placeholder,
@@ -140,6 +175,49 @@ export default function RichTextEditor({
         </button>
         
         <div className="w-px h-6 bg-gray-300 mx-1" />
+        
+        <button
+          onClick={() => editor.chain().focus().toggleCode().run()}
+          className={`p-2 rounded hover:bg-gray-200 text-black ${
+            editor.isActive('code') ? 'bg-gray-300' : ''
+          }`}
+          title="Code"
+        >
+          <Code size={16} strokeWidth={2} className="text-black" />
+        </button>
+        
+        <button
+          onClick={() => editor.chain().focus().toggleCodeBlock().run()}
+          className={`p-2 rounded hover:bg-gray-200 text-black ${
+            editor.isActive('codeBlock') ? 'bg-gray-300' : ''
+          }`}
+          title="Code Block"
+        >
+          <FileCode size={16} strokeWidth={2} className="text-black" />
+        </button>
+        
+        {editor.isActive('codeBlock') && (
+          <select
+            onChange={(e) => {
+              const language = e.target.value
+              editor.chain().focus().updateAttributes('codeBlock', { language }).run()
+            }}
+            className="ml-1 px-2 py-1 text-xs border border-gray-300 rounded bg-white text-black"
+            value={editor.getAttributes('codeBlock').language || 'javascript'}
+          >
+            <option value="javascript">JavaScript</option>
+            <option value="typescript">TypeScript</option>
+            <option value="python">Python</option>
+            <option value="java">Java</option>
+            <option value="cpp">C++</option>
+            <option value="html">HTML</option>
+            <option value="css">CSS</option>
+            <option value="json">JSON</option>
+            <option value="bash">Bash</option>
+            <option value="sql">SQL</option>
+            <option value="text">Plain Text</option>
+          </select>
+        )}
         
         <button
           onClick={() => editor.chain().focus().toggleBulletList().run()}
