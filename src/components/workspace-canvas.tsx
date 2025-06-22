@@ -35,6 +35,11 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   const [forceFinishEditingTimestamp, setForceFinishEditingTimestamp] = useState(0)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [redoStack, setRedoStack] = useState<UndoAction[]>([])
+  const [lastSelectionTime, setLastSelectionTime] = useState(0)
+  const [mouseDownTime, setMouseDownTime] = useState(0)
+  const [mouseDownPosition, setMouseDownPosition] = useState({ x: 0, y: 0 })
+  const [isTextSelectionActive, setIsTextSelectionActive] = useState(false)
+  const [lastCardInteractionTime, setLastCardInteractionTime] = useState(0)
   const [gridType, setGridType] = useState<'off' | 'dots' | 'lines'>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('jot-grid-type')
@@ -131,6 +136,47 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   useEffect(() => {
     localStorage.setItem('jot-snap-to-grid', snapToGrid.toString())
   }, [snapToGrid])
+
+  // Track text selection events globally to prevent forced saves during selection
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection()
+      const hasSelection = selection && !selection.isCollapsed
+      setIsTextSelectionActive(hasSelection || false)
+      
+      if (hasSelection || (selection && selection.toString().trim().length > 0)) {
+        setLastSelectionTime(Date.now())
+        console.log('Selection detected, updating lastSelectionTime')
+      }
+    }
+
+    const handleMouseUp = () => {
+      // Always update selection time on mouse up, in case selection changed
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed) {
+        setLastSelectionTime(Date.now())
+        setIsTextSelectionActive(true)
+        console.log('Mouse up with selection, updating lastSelectionTime')
+      } else {
+        // Clear selection state after a delay
+        setTimeout(() => setIsTextSelectionActive(false), 100)
+      }
+    }
+
+    const handleMouseDown = () => {
+      // Reset selection state on mouse down
+      setIsTextSelectionActive(false)
+    }
+
+    document.addEventListener('selectionchange', handleSelectionChange)
+    document.addEventListener('mouseup', handleMouseUp)
+    document.addEventListener('mousedown', handleMouseDown)
+    return () => {
+      document.removeEventListener('selectionchange', handleSelectionChange)
+      document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mousedown', handleMouseDown)
+    }
+  }, [])
 
   // Simple rule: if ANY card is outside viewport, show directional indicator
   useEffect(() => {
@@ -912,36 +958,108 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
       className: target.className,
       closest_card: target.closest('[data-card-id]'),
       closest_prose: target.closest('.prose'),
-      has_data_card_id: target.hasAttribute('data-card-id')
+      has_data_card_id: target.hasAttribute('data-card-id'),
+      isTextSelectionActive,
+      timeSinceSelection: Date.now() - lastSelectionTime
     })
     
-    // If click is inside a card or any card-related element, do nothing (let card handle it)
-    if (
-      target.closest('[data-card-id]') || 
-      target.closest('.prose') || 
-      target.hasAttribute('data-card-id') ||
-      // Check if the click is on any element that's part of a card
-      target.closest('div[style*="position: absolute"]')?.hasAttribute('data-card-id')
-    ) {
-      console.log('Click inside card detected, not forcing finish editing')
+    // MOST IMPORTANT: If there's ANY active text selection state, don't force save
+    if (isTextSelectionActive) {
+      console.log('Text selection is active, not forcing finish editing')
       return
     }
     
-    console.log('Click outside cards detected, forcing finish editing')
-    
-    // Click outside all cards - save/finish editing
-    if (connectingMode && firstConnectionCard) {
-      setConnectingMode(false)
-      setFirstConnectionCard(null)
-    } else {
-      setSelectedCardId(null)
+    // Check if there's ANY text selection anywhere in the document - if so, don't force save
+    const selection = window.getSelection()
+    if (selection && !selection.isCollapsed) {
+      console.log('Any text selection detected, not forcing finish editing')
+      return
     }
     
-    setForceFinishEditingTimestamp(Date.now())
+    // Check if there was recent card interaction (within 1000ms) - if so, don't force save
+    const timeSinceCardInteraction = Date.now() - lastCardInteractionTime
+    if (timeSinceCardInteraction < 1000) {
+      console.log('Recent card interaction detected, not forcing finish editing', { timeSinceCardInteraction })
+      return
+    }
+    
+    // Check if text selection occurred recently (within 2000ms) - be very conservative
+    const timeSinceSelection = Date.now() - lastSelectionTime
+    if (timeSinceSelection < 2000) {
+      console.log('Recent text selection detected, not forcing finish editing', { timeSinceSelection })
+      return
+    }
+    
+    // ENHANCED: Check if click is inside ANY part of ANY card - be much more thorough
+    const cardElement = target.closest('[data-card-id]') ||
+                       target.closest('.prose') ||
+                       target.closest('.card-content') ||
+                       target.closest('div[style*="position: absolute"]') ||
+                       // Check if target or any parent has card-related classes
+                       target.closest('.rich-text-editor') ||
+                       target.closest('.ql-editor') ||
+                       // Check if this element is inside a card by looking for card attributes on ancestors
+                       (() => {
+                         let parent = target.parentElement
+                         while (parent) {
+                           if (parent.hasAttribute('data-card-id') || parent.classList.contains('prose')) {
+                             return parent
+                           }
+                           parent = parent.parentElement
+                         }
+                         return null
+                       })()
+    
+    if (cardElement) {
+      console.log('Click inside card or card-related element detected, not forcing finish editing', {
+        cardElement: cardElement.tagName,
+        cardId: cardElement.getAttribute('data-card-id')
+      })
+      return
+    }
+    
+    // Check if this was a quick click (mouse down and up happened quickly and in same place)
+    const clickDuration = Date.now() - mouseDownTime
+    const mouseMovement = Math.abs(e.clientX - mouseDownPosition.x) + Math.abs(e.clientY - mouseDownPosition.y)
+    
+    // If mouse was held down for too long or moved too much, it might be a selection gesture
+    if (clickDuration > 300 || mouseMovement > 5) {
+      console.log('Click seems like a selection gesture, not forcing finish editing', { 
+        clickDuration, 
+        mouseMovement 
+      })
+      return
+    }
+    
+    console.log('Genuine click outside cards detected, forcing finish editing')
+    
+    // Use setTimeout to ensure any card click handlers have a chance to run first
+    setTimeout(() => {
+      // Double-check that there's still no active selection
+      const currentSelection = window.getSelection()
+      if (currentSelection && !currentSelection.isCollapsed) {
+        console.log('Selection detected during delayed save, aborting')
+        return
+      }
+      
+      // Click outside all cards - save/finish editing
+      if (connectingMode && firstConnectionCard) {
+        setConnectingMode(false)
+        setFirstConnectionCard(null)
+      } else {
+        setSelectedCardId(null)
+      }
+      
+      setForceFinishEditingTimestamp(Date.now())
+    }, 10) // Small delay to let card handlers run first
   }
 
   // Panning handlers - IMPROVED FOR FULL GRID DRAGGING
   const handleCanvasMouseDown = (e: React.MouseEvent) => {
+    // Track mouse down for distinguishing clicks from selections
+    setMouseDownTime(Date.now())
+    setMouseDownPosition({ x: e.clientX, y: e.clientY })
+    
     // Only start panning on left mouse button
     if (e.button === 0) {
       const target = e.target as HTMLElement
@@ -1462,6 +1580,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
                 gridSize={gridSize}
                 forceFinishEditingTimestamp={forceFinishEditingTimestamp}
                 connectingMode={connectingMode}
+                onCardInteraction={() => setLastCardInteractionTime(Date.now())}
               />
             </div>
           ))}

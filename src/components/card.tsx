@@ -16,6 +16,7 @@ interface CardProps {
   gridSize?: number
   forceFinishEditingTimestamp?: number
   connectingMode?: boolean
+  onCardInteraction?: () => void
 }
 
 export default function Card({ 
@@ -27,7 +28,8 @@ export default function Card({
   snapToGrid = false, 
   gridSize = 20,
   forceFinishEditingTimestamp = 0,
-  connectingMode = false
+  connectingMode = false,
+  onCardInteraction
 }: CardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [lastEditingStartTime, setLastEditingStartTime] = useState(0)
@@ -137,6 +139,13 @@ export default function Card({
   // Effect to handle forced finish editing from parent
   useEffect(() => {
     if (forceFinishEditingTimestamp > 0 && isEditing) {
+      // MOST IMPORTANT: Check if there's any text selection - if so, don't force finish
+      const selection = window.getSelection()
+      if (selection && !selection.isCollapsed) {
+        console.log('Ignoring force finish editing - text selection detected')
+        return
+      }
+
       // Ignore force finish if the card is currently being dragged
       if (isDragging) {
         console.log('Ignoring force finish editing - card is being dragged')
@@ -195,11 +204,33 @@ export default function Card({
       }`}
       data-card-id={card.id}
       onClick={(e) => {
+        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
+        e.preventDefault()
+        setLastUserActivityTime(Date.now())
+        onCardInteraction?.()
         onSelect(card.id)
       }}
       onMouseDown={(e) => {
+        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
+        e.preventDefault()
+        setLastUserActivityTime(Date.now())
+        onCardInteraction?.()
+      }}
+      onMouseUp={(e) => {
+        // AGGRESSIVELY stop all propagation to prevent canvas handlers
+        e.stopPropagation()
+        e.preventDefault()
+        setLastUserActivityTime(Date.now())
+        onCardInteraction?.()
+      }}
+      onDoubleClick={(e) => {
+        // AGGRESSIVELY stop all propagation to prevent canvas handlers
+        e.stopPropagation()
+        e.preventDefault()
+        setLastUserActivityTime(Date.now())
+        onCardInteraction?.()
       }}
     >
       <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
@@ -237,6 +268,22 @@ export default function Card({
                 e.stopPropagation()
                 setLastUserActivityTime(Date.now())
               }}
+              onMouseDown={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+              }}
+              onMouseUp={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+              }}
+              onSelect={(e) => {
+                e.stopPropagation()
+                setLastUserActivityTime(Date.now())
+              }}
+              onBlur={() => {
+                // Don't auto-save on blur - let users explicitly save or click outside
+                console.log('Title input blur - not auto-saving')
+              }}
               className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
               placeholder="Card title"
               autoFocus
@@ -246,8 +293,27 @@ export default function Card({
               className="flex-1 font-medium text-sm text-gray-900 truncate cursor-pointer hover:bg-gray-100 rounded px-2 py-1 transition-colors"
               onClick={(e) => {
                 console.log('Title clicked - entering edit mode')
+                
+                // Check if there's active text selection - if so, don't enter edit mode
+                const selection = window.getSelection()
+                if (selection && !selection.isCollapsed) {
+                  console.log('Text selection detected, not entering edit mode')
+                  e.stopPropagation()
+                  return
+                }
+                
                 e.stopPropagation()
+                onCardInteraction?.()
+                
+                // If already editing, don't change state - just update activity
+                if (isEditing) {
+                  console.log('Already in edit mode, just updating activity')
+                  setLastUserActivityTime(Date.now())
+                  return
+                }
+                
                 setLastEditingStartTime(Date.now())
+                setLastUserActivityTime(Date.now())
                 setIsEditing(true)
               }}
               title="Click to edit title"
@@ -279,9 +345,28 @@ export default function Card({
               <button
                 onClick={(e) => {
                   console.log('Edit button clicked!')
+                  
+                  // Check if there's active text selection - if so, don't enter edit mode
+                  const selection = window.getSelection()
+                  if (selection && !selection.isCollapsed) {
+                    console.log('Text selection detected, not entering edit mode')
+                    e.stopPropagation()
+                    return
+                  }
+                  
                   e.stopPropagation()
+                  onCardInteraction?.()
+                  
+                  // If already editing, don't change state - just update activity
+                  if (isEditing) {
+                    console.log('Already in edit mode, just updating activity')
+                    setLastUserActivityTime(Date.now())
+                    return
+                  }
+                  
                   console.log('Setting isEditing to true')
                   setLastEditingStartTime(Date.now())
+                  setLastUserActivityTime(Date.now())
                   setIsEditing(true)
                 }}
                 className="p-1 text-gray-600 hover:bg-gray-100 rounded"
@@ -352,22 +437,53 @@ export default function Card({
               console.log('Event target:', e.target)
               console.log('Current target:', e.currentTarget)
               console.log('Card content HTML:', card.content)
+              
+              // IMMEDIATELY update activity time and card interaction to prevent forced saves
+              setLastUserActivityTime(Date.now())
+              onCardInteraction?.()
+              
+              // Check if there's an active text selection - if so, don't enter edit mode
+              const selection = window.getSelection()
+              if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                console.log('Text selection detected, not entering edit mode')
+                e.stopPropagation()
+                e.preventDefault()
+                return
+              }
+              
               e.stopPropagation()
               e.preventDefault()
+              
               // If in connecting mode, prioritize connection over editing
               if (connectingMode) {
                 onSelect(card.id)
-              } else {
-                console.log('Setting isEditing to true from content click')
-                setLastEditingStartTime(Date.now())
-                setIsEditing(true)
+                return
               }
+              
+              // If already editing, don't change state - just update activity
+              if (isEditing) {
+                console.log('Already in edit mode, just updating activity')
+                return
+              }
+              
+              console.log('Setting isEditing to true from content click')
+              setLastEditingStartTime(Date.now())
+              setIsEditing(true)
             }}
             onMouseDown={(e) => {
               e.stopPropagation()
+              setLastUserActivityTime(Date.now()) // Immediate activity update
             }}
             onMouseUp={(e) => {
               e.stopPropagation()
+              setLastUserActivityTime(Date.now()) // Immediate activity update
+              
+              // Check if text selection was made - if so, don't enter edit mode
+              const selection = window.getSelection()
+              if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
+                console.log('Text selection completed, not entering edit mode')
+                return
+              }
             }}
             dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click to add content...</p>' }}
           />
