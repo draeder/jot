@@ -14,6 +14,7 @@ export interface Workspace {
   id: string;
   name: string;
   userId: string;
+  order: number; // For drag-and-drop reordering
   createdAt: Date;
   updatedAt: Date;
 }

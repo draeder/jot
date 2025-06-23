@@ -3,15 +3,163 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useSession } from 'next-auth/react'
 import { Workspace, Card, Connection, db } from '@/lib/db'
-import { Plus, FolderOpen, Edit2, Trash2, Check, X, Undo, Redo } from 'lucide-react'
+import { Plus, FolderOpen, Edit2, Trash2, Check, X, Undo, Redo, GripVertical } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 import ConfirmationModal from './confirmation-modal'
+import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, closestCenter } from '@dnd-kit/core'
+import { SortableContext, arrayMove, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 // Undo action types for workspace operations
 type WorkspaceUndoAction = 
   | { type: 'CREATE_WORKSPACE', workspace: Workspace }
   | { type: 'DELETE_WORKSPACE', workspace: Workspace, cards: Card[], connections: Connection[] }
   | { type: 'UPDATE_WORKSPACE', oldWorkspace: Workspace, newWorkspace: Workspace }
+  | { type: 'REORDER_WORKSPACES', oldOrder: Workspace[], newOrder: Workspace[] }
+
+// Sortable workspace item component
+function SortableWorkspaceItem({ 
+  workspace, 
+  isSelected, 
+  isEditing, 
+  editingName, 
+  onSelect, 
+  onEdit, 
+  onSave, 
+  onCancel, 
+  onDelete, 
+  onEditNameChange 
+}: {
+  workspace: Workspace
+  isSelected: boolean
+  isEditing: boolean
+  editingName: string
+  onSelect: () => void
+  onEdit: () => void
+  onSave: () => void
+  onCancel: () => void
+  onDelete: () => void
+  onEditNameChange: (value: string) => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id: workspace.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={`relative group cursor-pointer border rounded-lg transition-all ${
+        isSelected 
+          ? 'bg-blue-50 border-blue-200 shadow-sm' 
+          : 'bg-white border-gray-200 hover:bg-gray-50 hover:border-gray-300'
+      }`}
+    >
+      <div className="flex items-center gap-3 p-3">
+        {/* Drag handle */}
+        <div
+          {...attributes}
+          {...listeners}
+          className="flex items-center justify-center w-4 h-4 text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing"
+          title="Drag to reorder"
+        >
+          <GripVertical size={14} />
+        </div>
+
+        {/* Workspace icon and content */}
+        <div className="flex items-center gap-3 flex-1 min-w-0" onClick={onSelect}>
+          <FolderOpen size={16} className={isSelected ? 'text-blue-600' : 'text-gray-500'} />
+          
+          <div className="flex-1 min-w-0">
+            {isEditing ? (
+              <input
+                type="text"
+                value={editingName}
+                onChange={(e) => onEditNameChange(e.target.value)}
+                onBlur={onSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') onSave()
+                  if (e.key === 'Escape') onCancel()
+                }}
+                className="w-full px-2 py-1 text-sm border border-blue-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                autoFocus
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <span className={`block text-sm font-medium truncate ${
+                isSelected ? 'text-blue-900' : 'text-gray-900'
+              }`}>
+                {workspace.name}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Action buttons */}
+        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          {isEditing ? (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onSave()
+                }}
+                className="p-1 text-green-600 hover:bg-green-50 rounded"
+                title="Save"
+              >
+                <Check size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onCancel()
+                }}
+                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                title="Cancel"
+              >
+                <X size={14} />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onEdit()
+                }}
+                className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                title="Rename"
+              >
+                <Edit2 size={14} />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onDelete()
+                }}
+                className="p-1 text-red-500 hover:bg-red-50 rounded"
+                title="Delete"
+              >
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 interface WorkspaceSelectorProps {
   selectedWorkspaceId: string | null
@@ -27,6 +175,7 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
   const [editingName, setEditingName] = useState('')
   const [undoStack, setUndoStack] = useState<WorkspaceUndoAction[]>([])
   const [redoStack, setRedoStack] = useState<WorkspaceUndoAction[]>([])
+  const [draggedWorkspace, setDraggedWorkspace] = useState<Workspace | null>(null)
   const [deleteModal, setDeleteModal] = useState<{
     isOpen: boolean
     workspaceId: string
@@ -37,12 +186,36 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
     workspaceName: ''
   })
 
+  // Setup drag sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    })
+  )
+
   // Helper function to add action to undo stack
   const addToUndoStack = (action: WorkspaceUndoAction) => {
     setUndoStack(prev => [...prev, action].slice(-20)) // Keep last 20 actions
     // Clear redo stack when a new action is performed
     setRedoStack([])
   }
+
+  // Save last active workspace to localStorage
+  const saveLastActiveWorkspace = useCallback((workspaceId: string) => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('jot-last-active-workspace', workspaceId)
+    }
+  }, [])
+
+  // Load last active workspace from localStorage
+  const loadLastActiveWorkspace = useCallback((): string | null => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('jot-last-active-workspace')
+    }
+    return null
+  }, [])
 
   const loadWorkspaces = useCallback(async () => {
     if (!session?.user?.email) {
@@ -66,24 +239,94 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
       
       console.log('Found workspaces:', userWorkspaces.length)
       
-      // Sort by updatedAt in descending order (newest first)
-      userWorkspaces.sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
+      // Sort by order first, then by updatedAt if order is missing/same
+      userWorkspaces.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) {
+          return a.order - b.order
+        }
+        // Fallback to date sorting for workspaces without order
+        return b.updatedAt.getTime() - a.updatedAt.getTime()
+      })
       
       setWorkspaces(userWorkspaces)
       
-      // Auto-select first workspace if none selected
+      // Try to restore last active workspace first
+      const lastActiveWorkspaceId = loadLastActiveWorkspace()
+      const lastActiveExists = userWorkspaces.find(ws => ws.id === lastActiveWorkspaceId)
+      
       if (!selectedWorkspaceId && userWorkspaces.length > 0) {
-        console.log('Auto-selecting first workspace:', userWorkspaces[0].id)
-        onWorkspaceSelect(userWorkspaces[0].id)
+        if (lastActiveExists) {
+          console.log('Restoring last active workspace:', lastActiveWorkspaceId)
+          onWorkspaceSelect(lastActiveWorkspaceId!)
+        } else {
+          console.log('Auto-selecting first workspace:', userWorkspaces[0].id)
+          onWorkspaceSelect(userWorkspaces[0].id)
+          saveLastActiveWorkspace(userWorkspaces[0].id)
+        }
       }
     } catch (error) {
       console.error('Error loading workspaces:', error)
     }
-  }, [session, selectedWorkspaceId, onWorkspaceSelect])
+  }, [session, selectedWorkspaceId, onWorkspaceSelect, loadLastActiveWorkspace, saveLastActiveWorkspace])
 
   useEffect(() => {
     loadWorkspaces()
   }, [loadWorkspaces])
+
+  // Handle workspace selection and save to localStorage
+  const handleWorkspaceSelect = (workspaceId: string) => {
+    onWorkspaceSelect(workspaceId)
+    saveLastActiveWorkspace(workspaceId)
+  }
+
+  // Drag and drop handlers
+  const handleDragStart = (event: DragStartEvent) => {
+    const { active } = event
+    const workspace = workspaces.find(ws => ws.id === active.id)
+    if (workspace) {
+      setDraggedWorkspace(workspace)
+    }
+  }
+
+  const handleDragEnd = (event: DragEndEvent) => {
+    const { active, over } = event
+    setDraggedWorkspace(null)
+
+    if (!over || active.id === over.id) {
+      return
+    }
+
+    const oldIndex = workspaces.findIndex(ws => ws.id === active.id)
+    const newIndex = workspaces.findIndex(ws => ws.id === over.id)
+
+    if (oldIndex !== -1 && newIndex !== -1) {
+      const oldOrder = [...workspaces]
+      const newOrder = arrayMove(workspaces, oldIndex, newIndex)
+      
+      // Update order values in the database
+      const updatePromises = newOrder.map((workspace, index) => {
+        const newOrderValue = index
+        return db.workspaces.update(workspace.id, { order: newOrderValue })
+      })
+
+      // Update UI immediately (optimistic update)
+      setWorkspaces(newOrder.map((ws, index) => ({ ...ws, order: index })))
+      
+      // Update database in background
+      Promise.all(updatePromises).catch(error => {
+        console.error('Error updating workspace order:', error)
+        // Revert on error
+        setWorkspaces(oldOrder)
+      })
+
+      // Add to undo stack
+      addToUndoStack({ 
+        type: 'REORDER_WORKSPACES', 
+        oldOrder, 
+        newOrder: newOrder.map((ws, index) => ({ ...ws, order: index }))
+      })
+    }
+  }
 
   const createWorkspace = async () => {
     if (!session?.user?.email || !newWorkspaceName.trim()) return
@@ -93,17 +336,24 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
       const dbUser = await db.users.where('email').equals(session.user.email).first()
       if (!dbUser) return
 
+      // Calculate the next order value (add to end)
+      const maxOrder = workspaces.length > 0 
+        ? Math.max(...workspaces.map(ws => ws.order || 0))
+        : 0
+
       const newWorkspace: Workspace = {
         id: uuidv4(),
         name: newWorkspaceName.trim(),
         userId: dbUser.id,
+        order: maxOrder + 1,
         createdAt: new Date(),
         updatedAt: new Date(),
       }
 
       await db.workspaces.add(newWorkspace)
-      setWorkspaces(prev => [newWorkspace, ...prev])
+      setWorkspaces(prev => [...prev, newWorkspace])
       onWorkspaceSelect(newWorkspace.id)
+      saveLastActiveWorkspace(newWorkspace.id)
       setIsCreating(false)
       setNewWorkspaceName('')
       
@@ -250,6 +500,15 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
             ws.id === lastAction.oldWorkspace.id ? lastAction.oldWorkspace : ws
           ))
           break
+
+        case 'REORDER_WORKSPACES':
+          // Undo workspace reordering by restoring old order
+          const oldOrderRestorePromises = lastAction.oldOrder.map((workspace, index) => 
+            db.workspaces.update(workspace.id, { order: index })
+          )
+          await Promise.all(oldOrderRestorePromises)
+          setWorkspaces(lastAction.oldOrder)
+          break
       }
     } catch (error) {
       console.error('Error performing undo:', error)
@@ -302,6 +561,15 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
           setWorkspaces(prev => prev.map(ws => 
             ws.id === lastRedoAction.newWorkspace.id ? lastRedoAction.newWorkspace : ws
           ))
+          break
+
+        case 'REORDER_WORKSPACES':
+          // Redo workspace reordering by applying new order
+          const newOrderRestorePromises = lastRedoAction.newOrder.map((workspace, index) => 
+            db.workspaces.update(workspace.id, { order: index })
+          )
+          await Promise.all(newOrderRestorePromises)
+          setWorkspaces(lastRedoAction.newOrder)
           break
       }
     } catch (error) {
@@ -407,91 +675,49 @@ export default function WorkspaceSelector({ selectedWorkspaceId, onWorkspaceSele
         )}
       </div>
 
-      {/* Workspace list */}
+      {/* Workspace list with drag and drop */}
       <div className="flex-1 overflow-y-auto">
-        {workspaces.map(workspace => (
-          <div
-            key={workspace.id}
-            className={`group relative flex items-center px-4 py-3 hover:bg-gray-50 cursor-pointer min-w-0 ${
-              selectedWorkspaceId === workspace.id ? 'bg-blue-50 border-r-2 border-blue-500' : ''
-            }`}
-            onClick={() => !editingId && onWorkspaceSelect(workspace.id)}
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext 
+            items={workspaces.map(ws => ws.id)}
+            strategy={verticalListSortingStrategy}
           >
-            <FolderOpen 
-              size={16} 
-              className={`mr-3 flex-shrink-0 ${
-                selectedWorkspaceId === workspace.id ? 'text-blue-600' : 'text-gray-400'
-              }`} 
-            />
-            
-            {editingId === workspace.id ? (
-              <div className="flex items-center gap-2 flex-1">
-                <input
-                  type="text"
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
-                  autoFocus
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') updateWorkspace(workspace.id, editingName)
-                    if (e.key === 'Escape') cancelEditing()
-                  }}
+            <div className="space-y-2 p-3">
+              {workspaces.map(workspace => (
+                <SortableWorkspaceItem
+                  key={workspace.id}
+                  workspace={workspace}
+                  isSelected={selectedWorkspaceId === workspace.id}
+                  isEditing={editingId === workspace.id}
+                  editingName={editingName}
+                  onSelect={() => handleWorkspaceSelect(workspace.id)}
+                  onEdit={() => startEditing(workspace)}
+                  onSave={() => updateWorkspace(workspace.id, editingName)}
+                  onCancel={cancelEditing}
+                  onDelete={() => handleDeleteClick(workspace.id, workspace.name)}
+                  onEditNameChange={setEditingName}
                 />
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    updateWorkspace(workspace.id, editingName)
-                  }}
-                  className="p-1 text-green-600 hover:bg-green-100 rounded"
-                  title="Save"
-                >
-                  <Check size={14} />
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    cancelEditing()
-                  }}
-                  className="p-1 text-gray-600 hover:bg-gray-100 rounded"
-                  title="Cancel"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ) : (
-              <>
-                <span className={`flex-1 text-sm ${
-                  selectedWorkspaceId === workspace.id ? 'text-blue-900 font-medium' : 'text-gray-700'
-                } overflow-hidden text-ellipsis whitespace-nowrap pr-2`}>
-                  {workspace.name}
-                </span>
-                
-                <div className="opacity-0 group-hover:opacity-100 flex items-center gap-1 flex-shrink-0 ml-2">
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      startEditing(workspace)
-                    }}
-                    className="p-1 text-gray-600 hover:bg-gray-200 rounded"
-                    title="Rename"
-                  >
-                    <Edit2 size={12} />
-                  </button>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      handleDeleteClick(workspace.id, workspace.name)
-                    }}
-                    className="p-1 text-red-600 hover:bg-red-100 rounded"
-                    title="Delete"
-                  >
-                    <Trash2 size={12} />
-                  </button>
+              ))}
+            </div>
+          </SortableContext>
+          
+          <DragOverlay>
+            {draggedWorkspace ? (
+              <div className="bg-white border-2 border-blue-300 rounded-lg p-3 shadow-lg">
+                <div className="flex items-center gap-3">
+                  <GripVertical size={14} className="text-gray-400" />
+                  <FolderOpen size={16} className="text-blue-600" />
+                  <span className="text-sm font-medium text-gray-900">{draggedWorkspace.name}</span>
                 </div>
-              </>
-            )}
-          </div>
-        ))}
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
         
         {workspaces.length === 0 && !isCreating && (
           <div className="p-4 text-center text-gray-500 text-sm">

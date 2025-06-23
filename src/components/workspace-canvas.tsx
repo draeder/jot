@@ -1577,10 +1577,10 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               e.stopPropagation()
               navigateToDirection('left')
             }}
-            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-blue-50/90 hover:bg-blue-100 border border-blue-200 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
             title="Navigate to cards on the left"
           >
-            <ChevronLeft size={20} className="text-gray-600" />
+            <ChevronLeft size={20} className="text-blue-600" />
           </button>
         )}
         
@@ -1590,10 +1590,10 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               e.stopPropagation()
               navigateToDirection('right')
             }}
-            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-blue-50/90 hover:bg-blue-100 border border-blue-200 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
             title="Navigate to cards on the right"
           >
-            <ChevronRight size={20} className="text-gray-600" />
+            <ChevronRight size={20} className="text-blue-600" />
           </button>
         )}
         
@@ -1603,10 +1603,10 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               e.stopPropagation()
               navigateToDirection('up')
             }}
-            className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50/90 hover:bg-blue-100 border border-blue-200 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
             title="Navigate to cards above"
           >
-            <ChevronUp size={20} className="text-gray-600" />
+            <ChevronUp size={20} className="text-blue-600" />
           </button>
         )}
         
@@ -1616,10 +1616,10 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               e.stopPropagation()
               navigateToDirection('down')
             }}
-            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-white/90 hover:bg-white border border-gray-300 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
+            className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 bg-blue-50/90 hover:bg-blue-100 border border-blue-200 rounded-full p-2 shadow-lg transition-all duration-200 hover:scale-110"
             title="Navigate to cards below"
           >
-            <ChevronDown size={20} className="text-gray-600" />
+            <ChevronDown size={20} className="text-blue-600" />
           </button>
         )}
         <DndContext

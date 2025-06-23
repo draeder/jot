@@ -13,10 +13,15 @@ export default function Dashboard() {
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
   const workspaceCanvasRef = useRef<{ resetView: () => void } | null>(null)
 
-  // Handle workspace selection with implied reset
+  // Handle workspace selection with implied reset and persistence
   const handleWorkspaceSelect = (workspaceId: string) => {
     const previousWorkspaceId = selectedWorkspaceId
     setSelectedWorkspaceId(workspaceId)
+    
+    // Save to localStorage
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('jot-last-active-workspace', workspaceId)
+    }
     
     // If we're switching to a different workspace, trigger reset after a brief delay
     // to allow the new workspace to load
@@ -55,6 +60,7 @@ export default function Dashboard() {
               id: uuidv4(),
               name: 'My First Workspace',
               userId: userId,
+              order: 0,
               createdAt: new Date(),
               updatedAt: new Date(),
             }
