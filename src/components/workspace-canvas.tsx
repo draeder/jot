@@ -23,6 +23,7 @@ interface WorkspaceCanvasProps {
 // Interface for imperative handle
 export interface WorkspaceCanvasHandle {
   resetView: () => void
+  focusOnCard: (cardId: string) => void
 }
 
 const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(({ workspaceId }, ref) => {
@@ -216,10 +217,38 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     }, 100)
   }, [cards, gridSize])
 
+  // Focus on a specific card by moving the viewport to center it
+  const focusOnCard = useCallback((cardId: string) => {
+    const card = cards.find(c => c.id === cardId)
+    if (!card || typeof window === 'undefined') return
+
+    // Calculate viewport dimensions
+    const toolbarHeight = 80
+    const sidebarWidth = 256 // w-64 = 256px
+    const viewportWidth = window.innerWidth - sidebarWidth
+    const viewportHeight = window.innerHeight - toolbarHeight
+
+    // Calculate center position for the card
+    const cardCenterX = card.x + card.width / 2
+    const cardCenterY = card.y + card.height / 2
+
+    // Calculate the pan offset to center the card in the viewport
+    const newPanX = (viewportWidth / 2) - (cardCenterX * zoomLevel)
+    const newPanY = (viewportHeight / 2) - (cardCenterY * zoomLevel)
+
+    setPanOffset({ x: newPanX, y: newPanY })
+    
+    // Also select the card to highlight it
+    setSelectedCardId(cardId)
+    
+    console.log('Focused on card:', cardId, 'at position:', { x: card.x, y: card.y })
+  }, [cards, zoomLevel])
+
   // Expose reset function to parent component
   useImperativeHandle(ref, () => ({
-    resetView: resetViewToShowContent
-  }), [resetViewToShowContent])
+    resetView: resetViewToShowContent,
+    focusOnCard: focusOnCard
+  }), [resetViewToShowContent, focusOnCard])
 
   // Paging state
   const [pageIndicators, setPageIndicators] = useState<{

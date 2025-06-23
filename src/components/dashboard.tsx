@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import WorkspaceSelector from './workspace-selector'
 import WorkspaceCanvas from './workspace-canvas'
+import GlobalSearch from './global-search'
 import { LogOut, User } from 'lucide-react'
 import { db } from '../lib/db'
 import { v4 as uuidv4 } from 'uuid'
@@ -11,7 +12,7 @@ import { v4 as uuidv4 } from 'uuid'
 export default function Dashboard() {
   const { data: session } = useSession()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
-  const workspaceCanvasRef = useRef<{ resetView: () => void } | null>(null)
+  const workspaceCanvasRef = useRef<{ resetView: () => void; focusOnCard: (cardId: string) => void } | null>(null)
 
   // Handle workspace selection with implied reset and persistence
   const handleWorkspaceSelect = (workspaceId: string) => {
@@ -29,6 +30,22 @@ export default function Dashboard() {
       setTimeout(() => {
         workspaceCanvasRef.current?.resetView()
       }, 100)
+    }
+  }
+
+  // Handle search result selection - switch workspace and focus on card
+  const handleSearchResultSelect = (workspaceId: string, cardId: string) => {
+    // Switch to the workspace if not already selected
+    if (selectedWorkspaceId !== workspaceId) {
+      handleWorkspaceSelect(workspaceId)
+      
+      // Wait for workspace to load, then focus on card
+      setTimeout(() => {
+        workspaceCanvasRef.current?.focusOnCard(cardId)
+      }, 200)
+    } else {
+      // Already in the correct workspace, just focus on card
+      workspaceCanvasRef.current?.focusOnCard(cardId)
     }
   }
 
@@ -109,6 +126,11 @@ export default function Dashboard() {
                 Visual note-taking workspace
               </span>
             )}
+          </div>
+          
+          {/* Global Search - centered between logo and user info */}
+          <div className="flex-1 max-w-md mx-8">
+            <GlobalSearch onResultSelect={handleSearchResultSelect} />
           </div>
           
           <div className="flex items-center gap-3">
