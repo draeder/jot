@@ -32,7 +32,6 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   const [draggedCard, setDraggedCard] = useState<CardType | null>(null)
   const [connectingMode, setConnectingMode] = useState(false)
   const [firstConnectionCard, setFirstConnectionCard] = useState<string | null>(null)
-  const [forceFinishEditingTimestamp, setForceFinishEditingTimestamp] = useState(0)
   const [undoStack, setUndoStack] = useState<UndoAction[]>([])
   const [redoStack, setRedoStack] = useState<UndoAction[]>([])
   const [lastSelectionTime, setLastSelectionTime] = useState(0)
@@ -1049,8 +1048,6 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
       } else {
         setSelectedCardId(null)
       }
-      
-      setForceFinishEditingTimestamp(Date.now())
     }, 10) // Small delay to let card handlers run first
   }
 
@@ -1578,7 +1575,6 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
                 isSelected={selectedCardId === card.id || firstConnectionCard === card.id}
                 snapToGrid={snapToGrid}
                 gridSize={gridSize}
-                forceFinishEditingTimestamp={forceFinishEditingTimestamp}
                 connectingMode={connectingMode}
                 onCardInteraction={() => setLastCardInteractionTime(Date.now())}
               />

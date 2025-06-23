@@ -14,7 +14,6 @@ interface CardProps {
   isSelected: boolean
   snapToGrid?: boolean
   gridSize?: number
-  forceFinishEditingTimestamp?: number
   connectingMode?: boolean
   onCardInteraction?: () => void
 }
@@ -27,13 +26,10 @@ export default function Card({
   isSelected, 
   snapToGrid = false, 
   gridSize = 20,
-  forceFinishEditingTimestamp = 0,
   connectingMode = false,
   onCardInteraction
 }: CardProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [lastEditingStartTime, setLastEditingStartTime] = useState(0)
-  const [lastUserActivityTime, setLastUserActivityTime] = useState(0)
   
   // Debug isEditing state changes
   useEffect(() => {
@@ -77,9 +73,6 @@ export default function Card({
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing || !cardRef.current) return
-
-      // Update user activity time to prevent forced finish editing during resize
-      setLastUserActivityTime(Date.now())
 
       const rect = cardRef.current.getBoundingClientRect()
       let newWidth = e.clientX - rect.left
@@ -136,55 +129,31 @@ export default function Card({
     setIsEditing(false)
   }
 
-  // Effect to handle forced finish editing from parent
+  // New effect to handle clicks outside the card to force save
   useEffect(() => {
-    if (forceFinishEditingTimestamp > 0 && isEditing) {
-      // MOST IMPORTANT: Check if there's any text selection - if so, don't force finish
-      const selection = window.getSelection()
-      if (selection && !selection.isCollapsed) {
-        console.log('Ignoring force finish editing - text selection detected')
-        return
-      }
-
-      // Ignore force finish if the card is currently being dragged
-      if (isDragging) {
-        console.log('Ignoring force finish editing - card is being dragged')
-        return
-      }
-
-      // Ignore force finish if we just started editing (within 200ms to be more generous)
-      const timeSinceEditingStarted = Date.now() - lastEditingStartTime
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!isEditing || !cardRef.current) return
       
-      // Also ignore if there was recent user activity (within 500ms)
-      const timeSinceLastActivity = Date.now() - lastUserActivityTime
-      
-      if (timeSinceEditingStarted < 200) {
-        console.log('Ignoring force finish editing - just started editing', {
-          timeSinceEditingStarted,
-          lastEditingStartTime,
-          forceFinishEditingTimestamp
-        })
-        return
+      // Check if the click is outside this card
+      const target = event.target as Element
+      if (!cardRef.current.contains(target)) {
+        console.log('Click outside card detected, saving')
+        handleSave()
       }
-      
-      if (timeSinceLastActivity < 500) {
-        console.log('Ignoring force finish editing - recent user activity', {
-          timeSinceLastActivity,
-          lastUserActivityTime,
-          forceFinishEditingTimestamp
-        })
-        return
-      }
-      
-      console.log('Force finish editing triggered', {
-        timeSinceEditingStarted,
-        timeSinceLastActivity,
-        lastEditingStartTime,
-        forceFinishEditingTimestamp
-      })
-      handleSave()
     }
-  }, [forceFinishEditingTimestamp, handleSave, isEditing, lastEditingStartTime, lastUserActivityTime, isDragging])
+
+    if (isEditing) {
+      // Add delay to prevent immediate triggering when entering edit mode
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleClickOutside)
+      }, 100)
+      
+      return () => {
+        clearTimeout(timer)
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [isEditing, handleSave])
 
   return (
     <div
@@ -204,32 +173,24 @@ export default function Card({
       }`}
       data-card-id={card.id}
       onClick={(e) => {
-        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
         e.preventDefault()
-        setLastUserActivityTime(Date.now())
         onCardInteraction?.()
         onSelect(card.id)
       }}
       onMouseDown={(e) => {
-        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
         e.preventDefault()
-        setLastUserActivityTime(Date.now())
         onCardInteraction?.()
       }}
       onMouseUp={(e) => {
-        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
         e.preventDefault()
-        setLastUserActivityTime(Date.now())
         onCardInteraction?.()
       }}
       onDoubleClick={(e) => {
-        // AGGRESSIVELY stop all propagation to prevent canvas handlers
         e.stopPropagation()
         e.preventDefault()
-        setLastUserActivityTime(Date.now())
         onCardInteraction?.()
       }}
     >
@@ -249,40 +210,27 @@ export default function Card({
               value={title}
               onChange={(e) => {
                 setTitle(e.target.value)
-                setLastUserActivityTime(Date.now())
               }}
               onKeyDown={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
-                // Allow ESC to cancel
                 if (e.key === 'Escape') {
                   handleCancel()
                 }
-                // Note: Removed Enter key save behavior - users should use save button or click outside
               }}
               onKeyUp={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
               }}
               onKeyPress={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
               }}
               onMouseDown={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
               }}
               onMouseUp={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
               }}
               onSelect={(e) => {
                 e.stopPropagation()
-                setLastUserActivityTime(Date.now())
-              }}
-              onBlur={() => {
-                // Don't auto-save on blur - let users explicitly save or click outside
-                console.log('Title input blur - not auto-saving')
               }}
               className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
               placeholder="Card title"
@@ -305,15 +253,7 @@ export default function Card({
                 e.stopPropagation()
                 onCardInteraction?.()
                 
-                // If already editing, don't change state - just update activity
-                if (isEditing) {
-                  console.log('Already in edit mode, just updating activity')
-                  setLastUserActivityTime(Date.now())
-                  return
-                }
-                
-                setLastEditingStartTime(Date.now())
-                setLastUserActivityTime(Date.now())
+                // Enter edit mode for the entire card
                 setIsEditing(true)
               }}
               title="Click to edit title"
@@ -357,16 +297,7 @@ export default function Card({
                   e.stopPropagation()
                   onCardInteraction?.()
                   
-                  // If already editing, don't change state - just update activity
-                  if (isEditing) {
-                    console.log('Already in edit mode, just updating activity')
-                    setLastUserActivityTime(Date.now())
-                    return
-                  }
-                  
                   console.log('Setting isEditing to true')
-                  setLastEditingStartTime(Date.now())
-                  setLastUserActivityTime(Date.now())
                   setIsEditing(true)
                 }}
                 className="p-1 text-gray-600 hover:bg-gray-100 rounded"
@@ -393,35 +324,27 @@ export default function Card({
         {isEditing ? (
           <div
             style={{ 
-              height: 'calc(100% - 20px)', // Account for padding
+              height: 'calc(100% - 20px)',
               display: 'flex',
               flexDirection: 'column'
             }}
             onKeyDown={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now())
             }}
             onKeyUp={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now())
             }}
             onKeyPress={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now())
             }}
             onClick={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now())
             }}
           >
             <RichTextEditor
               content={content}
               onChange={(newContent) => {
                 setContent(newContent)
-                setLastUserActivityTime(Date.now())
-              }}
-              onUserActivity={() => {
-                setLastUserActivityTime(Date.now())
               }}
               placeholder="Write your note here..."
               className="flex-1"
@@ -429,17 +352,12 @@ export default function Card({
           </div>
         ) : (
           <div 
-            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 card-content ${
-              connectingMode ? 'cursor-crosshair' : 'cursor-pointer'
+            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 card-content transition-colors ${
+              connectingMode ? 'cursor-crosshair' : 'cursor-text'
             }`}
             onClick={(e) => {
               console.log('Content area clicked!', { connectingMode, isEditing })
-              console.log('Event target:', e.target)
-              console.log('Current target:', e.currentTarget)
-              console.log('Card content HTML:', card.content)
               
-              // IMMEDIATELY update activity time and card interaction to prevent forced saves
-              setLastUserActivityTime(Date.now())
               onCardInteraction?.()
               
               // Check if there's an active text selection - if so, don't enter edit mode
@@ -447,12 +365,10 @@ export default function Card({
               if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
                 console.log('Text selection detected, not entering edit mode')
                 e.stopPropagation()
-                e.preventDefault()
                 return
               }
               
               e.stopPropagation()
-              e.preventDefault()
               
               // If in connecting mode, prioritize connection over editing
               if (connectingMode) {
@@ -460,32 +376,17 @@ export default function Card({
                 return
               }
               
-              // If already editing, don't change state - just update activity
-              if (isEditing) {
-                console.log('Already in edit mode, just updating activity')
-                return
-              }
-              
               console.log('Setting isEditing to true from content click')
-              setLastEditingStartTime(Date.now())
               setIsEditing(true)
             }}
             onMouseDown={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now()) // Immediate activity update
             }}
             onMouseUp={(e) => {
               e.stopPropagation()
-              setLastUserActivityTime(Date.now()) // Immediate activity update
-              
-              // Check if text selection was made - if so, don't enter edit mode
-              const selection = window.getSelection()
-              if (selection && !selection.isCollapsed && selection.toString().trim().length > 0) {
-                console.log('Text selection completed, not entering edit mode')
-                return
-              }
             }}
-            dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm">Click to add content...</p>' }}
+            title="Click to edit content"
+            dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm italic">Click to add content...</p>' }}
           />
         )}
       </div>
@@ -498,7 +399,6 @@ export default function Card({
         }}
         onMouseDown={(e) => {
           e.preventDefault()
-          setLastUserActivityTime(Date.now()) // Update activity time when starting resize
           setIsResizing(true)
         }}
       />
