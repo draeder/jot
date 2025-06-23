@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, forwardRef, useImperativeHandle } fro
 import { DndContext, DragEndEvent, DragOverlay, DragStartEvent, useSensor, useSensors, PointerSensor, rectIntersection } from '@dnd-kit/core'
 import { Card as CardType, Connection, db } from '@/lib/db'
 import Card from './card'
-import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo, Redo, ChevronUp, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, ArrowRight, Minus, Grid3X3, RotateCcw, Undo, Redo, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ZoomIn, ZoomOut } from 'lucide-react'
 import { v4 as uuidv4 } from 'uuid'
 
 // Undo action types
@@ -65,16 +65,121 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     return { x: 0, y: 0 }
   })
 
+  // Zoom state
+  const [zoomLevel, setZoomLevel] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('jot-zoom-level')
+      return saved ? parseFloat(saved) : 1.0
+    }
+    return 1.0
+  })
+
+  // Zoom constraints
+  const MIN_ZOOM = 0.1
+  const MAX_ZOOM = 3.0
+  const ZOOM_STEP = 0.1
+
   // Grid settings
   const gridSize = 20 // 20px grid
 
-  // RESET function - ALWAYS positions to Page 1,1 (top-left cards at 1 grid box margin)
+  // Zoom functions
+  const zoomIn = useCallback(() => {
+    if (typeof window === 'undefined') return
+    
+    // Get the center of the viewport as zoom center
+    const viewportCenterX = window.innerWidth / 2
+    const viewportCenterY = (window.innerHeight - 80) / 2 // Account for toolbar height
+    
+    const newZoom = Math.min(MAX_ZOOM, zoomLevel + ZOOM_STEP)
+    
+    if (newZoom !== zoomLevel) {
+      // Calculate the zoom center in world coordinates
+      const worldX = (viewportCenterX - panOffset.x) / zoomLevel
+      const worldY = (viewportCenterY - panOffset.y) / zoomLevel
+      
+      // Calculate new pan offset to maintain zoom center
+      const newPanX = viewportCenterX - worldX * newZoom
+      const newPanY = viewportCenterY - worldY * newZoom
+      
+      setZoomLevel(newZoom)
+      setPanOffset({ x: newPanX, y: newPanY })
+    }
+  }, [zoomLevel, panOffset, MAX_ZOOM, ZOOM_STEP])
+
+  const zoomOut = useCallback(() => {
+    if (typeof window === 'undefined') return
+    
+    // Get the center of the viewport as zoom center
+    const viewportCenterX = window.innerWidth / 2
+    const viewportCenterY = (window.innerHeight - 80) / 2 // Account for toolbar height
+    
+    const newZoom = Math.max(MIN_ZOOM, zoomLevel - ZOOM_STEP)
+    
+    if (newZoom !== zoomLevel) {
+      // Calculate the zoom center in world coordinates
+      const worldX = (viewportCenterX - panOffset.x) / zoomLevel
+      const worldY = (viewportCenterY - panOffset.y) / zoomLevel
+      
+      // Calculate new pan offset to maintain zoom center
+      const newPanX = viewportCenterX - worldX * newZoom
+      const newPanY = viewportCenterY - worldY * newZoom
+      
+      setZoomLevel(newZoom)
+      setPanOffset({ x: newPanX, y: newPanY })
+    }
+  }, [zoomLevel, panOffset, MIN_ZOOM, ZOOM_STEP])
+
+  const resetZoom = useCallback(() => {
+    if (typeof window === 'undefined') return
+    
+    // Get the center of the viewport as zoom center
+    const viewportCenterX = window.innerWidth / 2
+    const viewportCenterY = (window.innerHeight - 80) / 2 // Account for toolbar height
+    
+    const newZoom = 1.0
+    
+    if (newZoom !== zoomLevel) {
+      // Calculate the zoom center in world coordinates
+      const worldX = (viewportCenterX - panOffset.x) / zoomLevel
+      const worldY = (viewportCenterY - panOffset.y) / zoomLevel
+      
+      // Calculate new pan offset to maintain zoom center
+      const newPanX = viewportCenterX - worldX * newZoom
+      const newPanY = viewportCenterY - worldY * newZoom
+      
+      setZoomLevel(newZoom)
+      setPanOffset({ x: newPanX, y: newPanY })
+    }
+  }, [zoomLevel, panOffset])
+
+  const handleZoomGesture = useCallback((e: WheelEvent, zoomCenter: { x: number, y: number }) => {
+    e.preventDefault()
+    
+    const zoomDelta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP
+    const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, zoomLevel + zoomDelta))
+    
+    if (newZoom !== zoomLevel) {
+      // Calculate the zoom center in world coordinates
+      const worldX = (zoomCenter.x - panOffset.x) / zoomLevel
+      const worldY = (zoomCenter.y - panOffset.y) / zoomLevel
+      
+      // Calculate new pan offset to maintain zoom center
+      const newPanX = zoomCenter.x - worldX * newZoom
+      const newPanY = zoomCenter.y - worldY * newZoom
+      
+      setZoomLevel(newZoom)
+      setPanOffset({ x: newPanX, y: newPanY })
+    }
+  }, [zoomLevel, panOffset, MIN_ZOOM, MAX_ZOOM, ZOOM_STEP])
+
+  // RESET function - ALWAYS positions to Page 1,1 (top-left cards at 1 grid box margin) and resets zoom
   const resetViewToShowContent = useCallback(() => {
     const gridMargin = gridSize * 1 // 20px
     
     if (cards.length === 0) {
-      // No cards, just reset to Page 1,1 position
+      // No cards, just reset to Page 1,1 position and reset zoom
       setPanOffset({ x: gridMargin, y: gridMargin })
+      setZoomLevel(1.0)
       return
     }
 
@@ -99,11 +204,13 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     }
 
     setPanOffset(newPanOffset)
+    setZoomLevel(1.0) // Reset zoom to 100%
     
     // Verify positioning after a brief delay
     setTimeout(() => {
       console.log('🔍 POST-RESET DEBUG:')
       console.log('  panOffset after reset:', newPanOffset)
+      console.log('  zoomLevel after reset: 100%')
       console.log('  Expected leftmost card screen position: minX + panOffset.x =', minX + newPanOffset.x)
       console.log('  Should equal gridMargin (20px):', gridMargin)
     }, 100)
@@ -126,6 +233,11 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
   useEffect(() => {
     localStorage.setItem('jot-pan-offset', JSON.stringify(panOffset))
   }, [panOffset])
+
+  // Persist zoom level to localStorage
+  useEffect(() => {
+    localStorage.setItem('jot-zoom-level', zoomLevel.toString())
+  }, [zoomLevel])
 
   // Save grid settings to localStorage when they change
   useEffect(() => {
@@ -190,10 +302,10 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     const canvasWidth = window.innerWidth - sidebarWidth
     const canvasHeight = window.innerHeight - toolbarHeight
 
-    const viewportLeft = -panOffset.x
-    const viewportRight = -panOffset.x + canvasWidth
-    const viewportTop = -panOffset.y
-    const viewportBottom = -panOffset.y + canvasHeight
+    const viewportLeft = -panOffset.x / zoomLevel
+    const viewportRight = (-panOffset.x + canvasWidth) / zoomLevel
+    const viewportTop = -panOffset.y / zoomLevel
+    const viewportBottom = (-panOffset.y + canvasHeight) / zoomLevel
 
     let hasLeft = false
     let hasRight = false
@@ -212,7 +324,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     })
 
     setPageIndicators({ left: hasLeft, right: hasRight, up: hasUp, down: hasDown })
-  }, [cards, panOffset])
+  }, [cards, panOffset, zoomLevel])
 
   // Also recalculate on window resize
   useEffect(() => {
@@ -254,7 +366,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     
     window.addEventListener('resize', handleResize)
     return () => window.removeEventListener('resize', handleResize)
-  }, [cards, panOffset])
+  }, [cards, panOffset, zoomLevel])
 
   // Helper function to add action to undo stack
   const addToUndoStack = (action: UndoAction) => {
@@ -832,11 +944,11 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     const viewportHeight = window.innerHeight - toolbarHeight
     const gridMargin = gridSize * 1 // 1 grid box margin
 
-    // Current viewport bounds in world coordinates
-    const viewportLeft = -panOffset.x
-    const viewportRight = -panOffset.x + viewportWidth
-    const viewportTop = -panOffset.y
-    const viewportBottom = -panOffset.y + viewportHeight
+    // Current viewport bounds in world coordinates (accounting for zoom)
+    const viewportLeft = -panOffset.x / zoomLevel
+    const viewportRight = (-panOffset.x + viewportWidth) / zoomLevel
+    const viewportTop = -panOffset.y / zoomLevel
+    const viewportBottom = (-panOffset.y + viewportHeight) / zoomLevel
 
     // Find cards in the specified direction
     const targetCards: CardType[] = []
@@ -1109,6 +1221,29 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     setIsPanning(false)
   }
 
+  // Handle wheel events for zooming
+  const handleCanvasWheel = useCallback((e: React.WheelEvent) => {
+    // Check if the target is within a card to avoid interfering with card scrolling
+    const target = e.target as HTMLElement
+    if (
+      target.closest('[data-card-id]') || // Cards (using data attribute)
+      target.closest('.prose') || // Card content areas
+      target.closest('.ql-editor') || // Quill editor
+      target.closest('.rich-text-editor') // Rich text editor
+    ) {
+      return // Let the card handle the scroll
+    }
+
+    // Get the mouse position relative to the canvas
+    const rect = e.currentTarget.getBoundingClientRect()
+    const zoomCenter = {
+      x: e.clientX - rect.left,
+      y: e.clientY - rect.top
+    }
+
+    handleZoomGesture(e.nativeEvent, zoomCenter)
+  }, [handleZoomGesture])
+
   // Handle double-click to create card at pointer location
   const handleCanvasDoubleClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement
@@ -1142,13 +1277,14 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
     const clickX = e.clientX - canvasRect.left
     const clickY = e.clientY - canvasRect.top
     
-    // Convert to world coordinates by accounting for pan offset
-    const worldX = clickX - panOffset.x
-    const worldY = clickY - panOffset.y
+    // Convert to world coordinates by accounting for pan offset and zoom
+    const worldX = (clickX - panOffset.x) / zoomLevel
+    const worldY = (clickY - panOffset.y) / zoomLevel
     
     console.log('🎯 DOUBLE-CLICK CREATE CARD:')
     console.log('  Click position:', { clickX, clickY })
     console.log('  Pan offset:', panOffset)
+    console.log('  Zoom level:', zoomLevel)
     console.log('  World coordinates:', { worldX, worldY })
     
     // Create card at the clicked position
@@ -1307,6 +1443,45 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
           
           {/* Grid Controls */}
           <div className="flex items-center gap-3 ml-4 border-l border-gray-300 pl-4">
+            {/* Zoom Controls */}
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-600">Zoom:</span>
+              <button
+                onClick={zoomOut}
+                disabled={zoomLevel <= MIN_ZOOM}
+                className={`flex items-center justify-center w-8 h-8 rounded ${
+                  zoomLevel <= MIN_ZOOM
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                title="Zoom Out"
+              >
+                <ZoomOut size={14} />
+              </button>
+              <span className="text-sm text-gray-600 min-w-[3rem] text-center">
+                {Math.round(zoomLevel * 100)}%
+              </span>
+              <button
+                onClick={zoomIn}
+                disabled={zoomLevel >= MAX_ZOOM}
+                className={`flex items-center justify-center w-8 h-8 rounded ${
+                  zoomLevel >= MAX_ZOOM
+                    ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+                title="Zoom In"
+              >
+                <ZoomIn size={14} />
+              </button>
+              <button
+                onClick={resetZoom}
+                className="text-xs px-2 py-1 bg-gray-100 text-gray-700 rounded hover:bg-gray-200"
+                title="Reset Zoom to 100%"
+              >
+                100%
+              </button>
+            </div>
+
             <button
               onClick={() => {
                 const nextType = gridType === 'off' ? 'dots' : gridType === 'dots' ? 'lines' : 'off'
@@ -1384,13 +1559,14 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
             gridType === 'dots' ?
             `radial-gradient(circle, #d1d5db 1px, transparent 1px)` :
             'none',
-          backgroundSize: gridType !== 'off' ? `${gridSize}px ${gridSize}px` : 'auto',
-          backgroundPosition: gridType !== 'off' ? `${panOffset.x % gridSize}px ${panOffset.y % gridSize}px` : 'auto',
+          backgroundSize: gridType !== 'off' ? `${gridSize * zoomLevel}px ${gridSize * zoomLevel}px` : 'auto',
+          backgroundPosition: gridType !== 'off' ? `${panOffset.x % (gridSize * zoomLevel)}px ${panOffset.y % (gridSize * zoomLevel)}px` : 'auto',
         }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
         onMouseLeave={handleCanvasMouseLeave}
+        onWheel={handleCanvasWheel}
         onClick={handleCanvasClick}
         onDoubleClick={handleCanvasDoubleClick}
       >
@@ -1470,14 +1646,14 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               
               const { from, to } = getCardConnectionPoints(fromCard, toCard)
               
-              // Apply pan offset to connection coordinates
+              // Apply pan offset and zoom to connection coordinates
               const adjustedFrom = {
-                x: from.x + panOffset.x,
-                y: from.y + panOffset.y
+                x: (from.x * zoomLevel) + panOffset.x,
+                y: (from.y * zoomLevel) + panOffset.y
               }
               const adjustedTo = {
-                x: to.x + panOffset.x,
-                y: to.y + panOffset.y
+                x: (to.x * zoomLevel) + panOffset.x,
+                y: (to.y * zoomLevel) + panOffset.y
               }
               
               return (
@@ -1489,7 +1665,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
                     x2={adjustedTo.x}
                     y2={adjustedTo.y}
                     stroke="transparent"
-                    strokeWidth="12"
+                    strokeWidth={12 * zoomLevel}
                     className="pointer-events-auto cursor-pointer"
                     onClick={(e) => {
                       e.stopPropagation()
@@ -1503,7 +1679,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
                     x2={adjustedTo.x}
                     y2={adjustedTo.y}
                     stroke="#6B7280"
-                    strokeWidth="2"
+                    strokeWidth={2 * zoomLevel}
                     markerEnd="url(#arrowhead)"
                     className="pointer-events-none group-hover:opacity-50 transition-opacity"
                   />
@@ -1514,7 +1690,7 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
                     x2={adjustedTo.x}
                     y2={adjustedTo.y}
                     stroke="#ef4444"
-                    strokeWidth="3"
+                    strokeWidth={3 * zoomLevel}
                     markerEnd="url(#arrowhead-red)"
                     className="pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity"
                   />
@@ -1526,27 +1702,29 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
             <defs>
               <marker
                 id="arrowhead"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
+                markerWidth={10 * zoomLevel}
+                markerHeight={7 * zoomLevel}
+                refX={9 * zoomLevel}
+                refY={3.5 * zoomLevel}
                 orient="auto"
+                markerUnits="userSpaceOnUse"
               >
                 <polygon
-                  points="0 0, 10 3.5, 0 7"
+                  points={`0 0, ${10 * zoomLevel} ${3.5 * zoomLevel}, 0 ${7 * zoomLevel}`}
                   fill="#6B7280"
                 />
               </marker>
               <marker
                 id="arrowhead-red"
-                markerWidth="10"
-                markerHeight="7"
-                refX="9"
-                refY="3.5"
+                markerWidth={10 * zoomLevel}
+                markerHeight={7 * zoomLevel}
+                refX={9 * zoomLevel}
+                refY={3.5 * zoomLevel}
                 orient="auto"
+                markerUnits="userSpaceOnUse"
               >
                 <polygon
-                  points="0 0, 10 3.5, 0 7"
+                  points={`0 0, ${10 * zoomLevel} ${3.5 * zoomLevel}, 0 ${7 * zoomLevel}`}
                   fill="#ef4444"
                 />
               </marker>
@@ -1560,7 +1738,8 @@ const WorkspaceCanvas = forwardRef<WorkspaceCanvasHandle, WorkspaceCanvasProps>(
               minHeight: '300vh',
               width: '300vw',
               height: '300vh',
-              transform: `translate(${panOffset.x}px, ${panOffset.y}px)`,
+              transform: `translate(${panOffset.x}px, ${panOffset.y}px) scale(${zoomLevel})`,
+              transformOrigin: '0 0',
               zIndex: 10
             }}
           >
