@@ -6,10 +6,12 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import Placeholder from '@tiptap/extension-placeholder'
 import Typography from '@tiptap/extension-typography'
 import Focus from '@tiptap/extension-focus'
+import TaskList from '@tiptap/extension-task-list'
+import TaskItem from '@tiptap/extension-task-item'
 import ResizableImage from 'tiptap-extension-resize-image'
 import { createLowlight } from 'lowlight'
 import { useEffect } from 'react'
-import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode, ImageIcon } from 'lucide-react'
+import { Bold, Italic, Strikethrough, List, ListOrdered, Quote, Undo, Redo, Code, FileCode, ImageIcon, CheckSquare } from 'lucide-react'
 
 // Import common language syntaxes
 import javascript from 'highlight.js/lib/languages/javascript'
@@ -66,6 +68,7 @@ export default function RichTextEditor({
       StarterKit.configure({
         // Enable code block but we'll replace it with CodeBlockLowlight
         codeBlock: false,
+        // Keep the default listItem - TaskItem will extend it
         // Ensure proper paragraph and hard break handling
         paragraph: {
           HTMLAttributes: {
@@ -95,6 +98,17 @@ export default function RichTextEditor({
       Focus.configure({
         className: 'has-focus',
         mode: 'all',
+      }),
+      TaskList.configure({
+        HTMLAttributes: {
+          class: 'task-list',
+        },
+      }),
+      TaskItem.configure({
+        nested: true,
+        HTMLAttributes: {
+          class: 'task-item',
+        },
       }),
       ResizableImage.configure({
         inline: false,
@@ -296,6 +310,16 @@ export default function RichTextEditor({
           title="Numbered List"
         >
           <ListOrdered size={16} strokeWidth={2} className="text-black" />
+        </button>
+        
+        <button
+          onClick={() => editor.chain().focus().toggleTaskList().run()}
+          className={`p-2 rounded hover:bg-gray-200 text-black ${
+            editor.isActive('taskList') ? 'bg-gray-300' : ''
+          }`}
+          title="Checklist"
+        >
+          <CheckSquare size={16} strokeWidth={2} className="text-black" />
         </button>
         
         <button

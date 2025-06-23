@@ -20,6 +20,8 @@
     "@tiptap/extension-focus": "^2.14.0",
     "@tiptap/extension-image": "^2.22.1",
     "@tiptap/extension-placeholder": "^2.14.0",
+    "@tiptap/extension-task-item": "^2.22.3",
+    "@tiptap/extension-task-list": "^2.22.3",
     "@tiptap/extension-typography": "^2.14.0",
     "@tiptap/react": "^2.14.0",
     "@tiptap/starter-kit": "^2.14.0",
