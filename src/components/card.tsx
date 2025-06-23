@@ -95,18 +95,41 @@ export default function Card({
       })
     }
 
-    const handleMouseUp = () => {
-      setIsResizing(false)
+    const handleMouseUp = (e: MouseEvent) => {
+      if (isResizing) {
+        e.preventDefault()
+        e.stopPropagation()
+        setIsResizing(false)
+      }
     }
 
     if (isResizing) {
       document.addEventListener('mousemove', handleMouseMove)
       document.addEventListener('mouseup', handleMouseUp)
+      // Also listen for mouse leave to handle edge cases
+      document.addEventListener('mouseleave', handleMouseUp)
+      
+      // Prevent text selection during resize
+      document.body.style.userSelect = 'none'
+      document.body.style.pointerEvents = 'none'
+      
+      // Re-enable pointer events on the card being resized
+      if (cardRef.current) {
+        cardRef.current.style.pointerEvents = 'auto'
+      }
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove)
       document.removeEventListener('mouseup', handleMouseUp)
+      document.removeEventListener('mouseleave', handleMouseUp)
+      
+      // Restore normal pointer events and text selection
+      document.body.style.userSelect = ''
+      document.body.style.pointerEvents = ''
+      if (cardRef.current) {
+        cardRef.current.style.pointerEvents = ''
+      }
     }
   }, [isResizing, card, onUpdate, snapToGrid, gridSize, snapToGridDimensions])
 
@@ -132,7 +155,7 @@ export default function Card({
   // New effect to handle clicks outside the card to force save
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (!isEditing || !cardRef.current) return
+      if (!isEditing || !cardRef.current || isResizing) return
       
       // Check if the click is outside this card
       const target = event.target as Element
@@ -142,7 +165,7 @@ export default function Card({
       }
     }
 
-    if (isEditing) {
+    if (isEditing && !isResizing) {
       // Add delay to prevent immediate triggering when entering edit mode
       const timer = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside)
@@ -153,7 +176,7 @@ export default function Card({
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isEditing, handleSave])
+  }, [isEditing, isResizing, handleSave])
 
   return (
     <div
@@ -393,13 +416,27 @@ export default function Card({
 
       {/* Resize handle */}
       <div
-        className="absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-gray-300 hover:bg-gray-400"
+        className={`absolute bottom-0 right-0 w-4 h-4 cursor-se-resize bg-gray-300 hover:bg-gray-400 ${
+          isResizing ? 'bg-gray-400' : ''
+        }`}
         style={{
           clipPath: 'polygon(100% 0%, 0% 100%, 100% 100%)',
+          zIndex: 10, // Ensure resize handle is always on top
         }}
         onMouseDown={(e) => {
           e.preventDefault()
+          e.stopPropagation()
+          console.log('Resize handle mousedown - setting isResizing to true')
           setIsResizing(true)
+          onCardInteraction?.()
+        }}
+        onMouseUp={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+        }}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
         }}
       />
     </div>
