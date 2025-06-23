@@ -5,13 +5,15 @@ import { useSession, signOut } from 'next-auth/react'
 import WorkspaceSelector from './workspace-selector'
 import WorkspaceCanvas from './workspace-canvas'
 import GlobalSearch from './global-search'
-import { LogOut, User } from 'lucide-react'
+import DocsModal from './docs-modal'
+import { LogOut, User, Book } from 'lucide-react'
 import { db } from '../lib/db'
 import { v4 as uuidv4 } from 'uuid'
 
 export default function Dashboard() {
   const { data: session } = useSession()
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(null)
+  const [isDocsOpen, setIsDocsOpen] = useState(false)
   const workspaceCanvasRef = useRef<{ resetView: () => void; focusOnCard: (cardId: string) => void } | null>(null)
 
   // Handle workspace selection with implied reset and persistence
@@ -139,6 +141,14 @@ export default function Dashboard() {
               <span>{session.user?.name || session.user?.email}</span>
             </div>
             <button
+              onClick={() => setIsDocsOpen(true)}
+              className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
+              title="Documentation"
+            >
+              <Book size={16} />
+              Docs
+            </button>
+            <button
               onClick={() => signOut()}
               className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"
               title="Sign Out"
@@ -188,6 +198,12 @@ export default function Dashboard() {
           )}
         </div>
       </div>
+      
+      {/* Documentation Modal */}
+      <DocsModal 
+        isOpen={isDocsOpen} 
+        onClose={() => setIsDocsOpen(false)} 
+      />
     </div>
   )
 }
