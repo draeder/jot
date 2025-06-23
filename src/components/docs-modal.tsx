@@ -32,7 +32,7 @@ const docsContent: Section[] = [
         content: (
           <div>
             <ol className="list-decimal list-inside space-y-2">
-              <li><strong>Sign In</strong>: Choose from multiple authentication options (Google, GitHub, Apple, Microsoft, or Local)</li>
+              <li><strong>Sign In</strong>: Enter any name to get started</li>
               <li><strong>Default Workspace</strong>: A &quot;My First Workspace&quot; is automatically created for new users</li>
               <li><strong>Create Your First Card</strong>: Click the &quot;Add Card&quot; button in the toolbar</li>
               <li><strong>Start Typing</strong>: Click on any card to begin editing with rich text</li>
@@ -91,29 +91,43 @@ const docsContent: Section[] = [
   },
   {
     id: 'authentication',
-    title: 'Authentication & Account Management',
-    content: `Jot supports multiple authentication providers for flexible access to your notes.`,
+    title: 'Getting Started with Jot',
+    content: (
+      <div>
+        <p>Jot uses simple local authentication to get you started quickly while keeping your data private.</p>
+      </div>
+    ),
     subsections: [
       {
-        id: 'auth-providers',
-        title: 'Supported Providers',
+        id: 'local-auth',
+        title: 'Local Authentication',
         content: (
           <div className="space-y-4">
             <div>
-              <h4 className="font-semibold text-lg mb-2">OAuth Providers:</h4>
+              <h4 className="font-semibold text-lg mb-2">Simple Sign In:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Google</strong>: Sign in with your Google account</li>
-                <li><strong>GitHub</strong>: Use your GitHub credentials</li>
-                <li><strong>Apple</strong>: Apple ID authentication</li>
-                <li><strong>Microsoft</strong>: Corporate/organizational accounts</li>
+                <li><strong>Enter Any Name</strong>: No external account required</li>
+                <li><strong>Instant Access</strong>: Start using Jot immediately</li>
+                <li><strong>Local Storage</strong>: Your name is saved locally in your browser</li>
+                <li><strong>Privacy First</strong>: No data sent to external servers</li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-lg mb-2">Local Authentication:</h4>
+              <h4 className="font-semibold text-lg mb-2">How It Works:</h4>
+              <ol className="list-decimal list-inside space-y-1 ml-4">
+                <li>Visit the Jot application</li>
+                <li>Enter any name you&apos;d like to use</li>
+                <li>Click &quot;Sign In&quot; to get started</li>
+                <li>Your name is remembered for future visits</li>
+              </ol>
+            </div>
+            <div>
+              <h4 className="font-semibold text-lg mb-2">Benefits:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Local-only</strong>: Enter any name, no external account required</li>
-                <li>Perfect for testing or when you prefer not to use OAuth</li>
-                <li>Data remains local to your browser</li>
+                <li><strong>No Registration</strong>: No need to create accounts</li>
+                <li><strong>Maximum Privacy</strong>: All data stays on your device</li>
+                <li><strong>Quick Start</strong>: Begin taking notes immediately</li>
+                <li><strong>Offline Ready</strong>: Works without internet after first load</li>
               </ul>
             </div>
           </div>
@@ -137,7 +151,7 @@ const docsContent: Section[] = [
             <div>
               <h4 className="font-semibold text-lg mb-2">User Data Stored:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li>User profile (email, name, image from auth provider)</li>
+                <li>User name (entered during sign-in)</li>
                 <li>Workspace definitions and organization</li>
                 <li>All cards and their content</li>
                 <li>Card positions and sizes</li>
@@ -1141,7 +1155,7 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
             <div>
               <h4 className="font-semibold text-lg mb-2">Data Schema:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Users Table</strong>: Profile information from auth providers</li>
+                <li><strong>Users Table</strong>: Simple name entered during sign-in</li>
                 <li><strong>Workspaces Table</strong>: Workspace definitions and metadata</li>
                 <li><strong>Cards Table</strong>: All card content, positions, and formatting</li>
                 <li><strong>Connections Table</strong>: Arrow connections between cards</li>
@@ -1426,11 +1440,11 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
         content: (
           <div className="space-y-4">
             <div>
-              <h4 className="font-semibold text-lg mb-2">Authentication Problems:</h4>
+              <h4 className="font-semibold text-lg mb-2">Sign-In Issues:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Provider Not Working</strong>: Check internet connection and try different provider</li>
-                <li><strong>Login Loop</strong>: Clear browser cache and cookies</li>
-                <li><strong>No Providers Available</strong>: Use Local-only option as fallback</li>
+                <li><strong>Name Not Saving</strong>: Check if browser allows local storage</li>
+                <li><strong>Signed Out Unexpectedly</strong>: Browser may have cleared local data</li>
+                <li><strong>Can&apos;t Access</strong>: Try refreshing the page and signing in again</li>
               </ul>
             </div>
             <div>
@@ -1510,10 +1524,10 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
             <div>
               <h4 className="font-semibold text-lg mb-2">If Data Seems Lost:</h4>
               <ol className="list-decimal list-inside space-y-1 ml-4">
-                <li><strong>Check Authentication</strong>: Ensure signed in with correct account</li>
+                <li><strong>Check Sign-In Name</strong>: Ensure using the same name as before</li>
                 <li><strong>Try Different Browser</strong>: Data might be in different browser profile</li>
                 <li><strong>Check Browser Storage</strong>: Look for IndexedDB data in developer tools</li>
-                <li><strong>Account Switching</strong>: Try signing out and back in</li>
+                <li><strong>Re-enter Name</strong>: Try signing in with your original name</li>
               </ol>
             </div>
             <div>
