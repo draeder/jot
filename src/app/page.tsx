@@ -4,6 +4,7 @@ import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import Dashboard from '@/components/dashboard'
+import LandingPage from './landing/page'
 
 export default function Home() {
   const { data: session, status } = useSession()
@@ -15,41 +16,32 @@ export default function Home() {
     if (status === 'loading') {
       // Set a timeout to prevent infinite loading
       const timeout = setTimeout(() => {
-        console.log('Session loading timeout - forcing redirect to signin')
+        console.log('Session loading timeout - showing landing page')
         setForceRedirect(true)
-      }, 10000) // 10 seconds timeout
+      }, 5000) // 5 seconds timeout
       
       return () => clearTimeout(timeout)
     }
-    
-    if (!session || forceRedirect) {
-      console.log('No session or forced redirect, redirecting to signin')
-      router.push('/auth/signin')
-    }
   }, [session, status, router, forceRedirect])
 
+  // Show loading only briefly
   if (status === 'loading' && !forceRedirect) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading session...</p>
-          <p className="mt-2 text-sm text-gray-500">Status: {status}</p>
+          <p className="mt-4 text-gray-600">Loading...</p>
         </div>
       </div>
     )
   }
 
+  // If no session, show landing page
   if (!session || forceRedirect) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Redirecting to sign in...</p>
-        </div>
-      </div>
-    )
+    return <LandingPage />
   }
 
+  // If logged in, show the dashboard
   console.log('Rendering Dashboard with session:', session.user?.email)
   return <Dashboard />
 }

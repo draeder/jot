@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import Providers from "@/components/providers";
+import JsonLd from "@/components/json-ld";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -14,10 +15,29 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Jot - Visual Note Taking",
-  description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas with drag-and-drop cards, syntax highlighting, and seamless connections.",
-  keywords: ["notes", "visual", "canvas", "mind mapping", "productivity", "rich text", "collaboration"],
-  authors: [{ name: "Jot Team" }],
+  metadataBase: new URL("https://jot-app.com"), // Update with your actual domain
+  title: {
+    default: "Jot - Visual Note Taking",
+    template: "%s | Jot"
+  },
+  description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas with drag-and-drop cards, syntax highlighting, and seamless connections. Free forever, completely private.",
+  keywords: [
+    "visual notes", 
+    "note taking", 
+    "mind mapping", 
+    "canvas", 
+    "productivity", 
+    "rich text", 
+    "visual thinking", 
+    "knowledge management",
+    "infinite canvas",
+    "card-based notes",
+    "visual workspace",
+    "drag and drop",
+    "privacy-first",
+    "offline notes"
+  ],
+  authors: [{ name: "Jot Team", url: "https://jot-app.com" }],
   creator: "Jot",
   publisher: "Jot",
   
@@ -25,10 +45,10 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     locale: "en_US",
-    url: "https://jot-ooo-c032f6516eeb.herokuapp.com/",
+    url: "https://jot-app.com",
     siteName: "Jot",
-    title: "Jot - Visual Note Taking",
-    description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas with drag-and-drop cards, syntax highlighting, and seamless connections.",
+    title: "Jot - Visual Note Taking Workspace",
+    description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas with drag-and-drop cards, syntax highlighting, and seamless connections. Free forever, completely private.",
     images: [
       {
         url: "/jotlogo.png",
@@ -45,8 +65,8 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     site: "@jot",
     creator: "@jot",
-    title: "Jot - Visual Note Taking",
-    description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas.",
+    title: "Jot - Visual Note Taking Workspace",
+    description: "Create connected visual notes with rich text editing. Organize your thoughts in an infinite canvas. Free forever, completely private.",
     images: ["/jotlogo.png"],
   },
   
@@ -96,6 +116,9 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
+      <head>
+        <JsonLd />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
