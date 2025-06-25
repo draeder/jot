@@ -302,7 +302,7 @@ export default function LandingPage() {
                     Love Jot? Support its development!
                   </p>
                   <a 
-                    href="https://buymeacoffee.com/jot" 
+                    href="https://coff.ee/draederg" 
                     target="_blank" 
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-2 bg-yellow-500 text-white px-6 py-3 rounded-lg hover:bg-yellow-600 transition-colors font-medium"
@@ -368,7 +368,7 @@ export default function LandingPage() {
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-gray-400">
                 <li><Link href="/docs" className="hover:text-white transition-colors">Help Center</Link></li>
-                <li><a href="https://buymeacoffee.com/jot" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Buy me a coffee</a></li>
+                <li><a href="https://coff.ee/draederg" target="_blank" rel="noopener noreferrer" className="hover:text-white transition-colors">Buy me a coffee</a></li>
               </ul>
             </div>
             
