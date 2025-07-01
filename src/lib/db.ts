@@ -28,6 +28,7 @@ export interface Card {
   y: number;
   width: number;
   height: number;
+  backgroundColor?: string; // Card background color
   createdAt: Date;
   updatedAt: Date;
 }

@@ -38,6 +38,7 @@ export default function Card({
   const [title, setTitle] = useState(card.title)
   const [content, setContent] = useState(card.content)
   const [isResizing, setIsResizing] = useState(false)
+  const [showColorPicker, setShowColorPicker] = useState(false)
   const cardRef = useRef<HTMLDivElement>(null)
 
   // Snap dimensions to grid
@@ -152,20 +153,51 @@ export default function Card({
     setIsEditing(false)
   }
 
+  const handleColorChange = (color: string) => {
+    onUpdate({
+      ...card,
+      backgroundColor: color,
+      updatedAt: new Date(),
+    })
+    setShowColorPicker(false)
+  }
+
+  // Calculate text color based on background luminosity
+  const getTextColor = (backgroundColor: string) => {
+    if (!backgroundColor || backgroundColor === '#ffffff') return '#000000'
+    
+    // Convert hex to RGB
+    const hex = backgroundColor.replace('#', '')
+    const r = parseInt(hex.substr(0, 2), 16)
+    const g = parseInt(hex.substr(2, 2), 16)
+    const b = parseInt(hex.substr(4, 2), 16)
+    
+    // Calculate luminosity using the relative luminance formula
+    const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    
+    // Return white text for dark backgrounds, black text for light backgrounds
+    return luminance > 0.5 ? '#000000' : '#ffffff'
+  }
+
   // New effect to handle clicks outside the card to force save
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      if (!isEditing || !cardRef.current || isResizing) return
+      if ((!isEditing && !showColorPicker) || !cardRef.current || isResizing) return
       
       // Check if the click is outside this card
       const target = event.target as Element
       if (!cardRef.current.contains(target)) {
-        console.log('Click outside card detected, saving')
-        handleSave()
+        if (isEditing) {
+          console.log('Click outside card detected, saving')
+          handleSave()
+        }
+        if (showColorPicker) {
+          setShowColorPicker(false)
+        }
       }
     }
 
-    if (isEditing && !isResizing) {
+    if ((isEditing || showColorPicker) && !isResizing) {
       // Add delay to prevent immediate triggering when entering edit mode
       const timer = setTimeout(() => {
         document.addEventListener('mousedown', handleClickOutside)
@@ -176,7 +208,34 @@ export default function Card({
         document.removeEventListener('mousedown', handleClickOutside)
       }
     }
-  }, [isEditing, isResizing, handleSave])
+  }, [isEditing, isResizing, handleSave, showColorPicker])
+
+  // Separate effect to handle color picker clicks outside
+  useEffect(() => {
+    const handleColorPickerClickOutside = (event: MouseEvent) => {
+      if (!showColorPicker || !cardRef.current) return
+      
+      const target = event.target as Element
+      const colorPickerContainer = cardRef.current.querySelector('.color-picker-container')
+      
+      // Check if click is outside the color picker container
+      if (colorPickerContainer && !colorPickerContainer.contains(target)) {
+        setShowColorPicker(false)
+      }
+    }
+
+    if (showColorPicker) {
+      // Add a small delay to prevent immediate closure
+      const timer = setTimeout(() => {
+        document.addEventListener('mousedown', handleColorPickerClickOutside)
+      }, 100)
+      
+      return () => {
+        clearTimeout(timer)
+        document.removeEventListener('mousedown', handleColorPickerClickOutside)
+      }
+    }
+  }, [showColorPicker])
 
   return (
     <div
@@ -188,8 +247,9 @@ export default function Card({
         ...style,
         width: card.width,
         height: card.height,
+        backgroundColor: card.backgroundColor || '#ffffff',
       }}
-      className={`absolute bg-white border-2 rounded-lg shadow-lg flex flex-col cursor-default ${
+      className={`absolute border-2 rounded-lg shadow-lg flex flex-col cursor-default ${
         isSelected ? 'border-blue-500' : 'border-gray-200'
       } ${isDragging ? 'opacity-50' : ''} ${
         connectingMode ? 'hover:border-orange-400 hover:shadow-orange-200' : ''
@@ -217,8 +277,8 @@ export default function Card({
         onCardInteraction?.()
       }}
     >
-      <div className="flex items-center justify-between p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-        <div className="flex items-center gap-2 flex-1">
+      <div className="flex items-center justify-between p-3 border-b border-gray-200 rounded-t-lg" style={{ backgroundColor: 'rgba(249, 250, 251, 0.8)' }}>
+        <div className="flex items-center gap-3 flex-1 mr-3">
           <div
             {...attributes}
             {...listeners}
@@ -285,7 +345,95 @@ export default function Card({
             </h3>
           )}
         </div>
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-2">
+          {/* Color picker - always visible */}
+          <div className="relative color-picker-container">
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowColorPicker(!showColorPicker)
+              }}
+              className="w-5 h-5 rounded border-2 border-gray-300 hover:border-gray-400 transition-colors"
+              style={{ 
+                background: card.backgroundColor === '#ffffff' || !card.backgroundColor
+                  ? 'conic-gradient(from 0deg, #ff0000 0deg, #ff8000 45deg, #ffff00 90deg, #80ff00 135deg, #00ff00 180deg, #00ff80 225deg, #00ffff 270deg, #0080ff 315deg, #0000ff 360deg, #8000ff 405deg, #ff00ff 450deg, #ff0080 495deg, #ff0000 540deg)'
+                  : `linear-gradient(45deg, ${card.backgroundColor} 0%, #ffffff 100%)`
+              }}
+              title="Change background color"
+            />
+            {showColorPicker && (
+              <div className="absolute top-6 right-0 z-50 bg-white border border-gray-200 rounded-lg shadow-lg p-3">
+                <div className="w-32 h-32 relative">
+                  {/* Rainbow color wheel */}
+                  <svg
+                    width="128"
+                    height="128"
+                    viewBox="0 0 128 128"
+                    className="absolute top-0 left-0"
+                  >
+                    {/* Create the rainbow wheel with clickable segments */}
+                    {Array.from({ length: 360 }, (_, i) => {
+                      const angle = i * (Math.PI / 180)
+                      const hue = i
+                      const innerRadius = 30
+                      const outerRadius = 60
+                      
+                      // Calculate path coordinates for a slice
+                      const x1 = 64 + innerRadius * Math.cos(angle)
+                      const y1 = 64 + innerRadius * Math.sin(angle)
+                      const x2 = 64 + outerRadius * Math.cos(angle)
+                      const y2 = 64 + outerRadius * Math.sin(angle)
+                      
+                      const nextAngle = (i + 1) * (Math.PI / 180)
+                      const x3 = 64 + outerRadius * Math.cos(nextAngle)
+                      const y3 = 64 + outerRadius * Math.sin(nextAngle)
+                      const x4 = 64 + innerRadius * Math.cos(nextAngle)
+                      const y4 = 64 + innerRadius * Math.sin(nextAngle)
+                      
+                      const pathData = `M ${x1} ${y1} L ${x2} ${y2} L ${x3} ${y3} L ${x4} ${y4} Z`
+                      
+                      return (
+                        <path
+                          key={i}
+                          d={pathData}
+                          fill={`hsl(${hue}, 85%, 60%)`}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => {
+                            // Convert HSL to hex
+                            const hslToHex = (h: number, s: number, l: number) => {
+                              l /= 100
+                              const a = s * Math.min(l, 1 - l) / 100
+                              const f = (n: number) => {
+                                const k = (n + h / 30) % 12
+                                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1)
+                                return Math.round(255 * color).toString(16).padStart(2, '0')
+                              }
+                              return `#${f(0)}${f(8)}${f(4)}`
+                            }
+                            
+                            const hexColor = hslToHex(hue, 85, 60)
+                            handleColorChange(hexColor)
+                          }}
+                        />
+                      )
+                    })}
+                    
+                    {/* Inner white circle for reset */}
+                    <circle
+                      cx="64"
+                      cy="64"
+                      r="25"
+                      fill="white"
+                      stroke="#ddd"
+                      strokeWidth="2"
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => handleColorChange('#ffffff')}
+                    />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </div>
           {isEditing ? (
             <>
               <button
@@ -343,11 +491,11 @@ export default function Card({
         </div>
       </div>
 
-      <div className="flex-1 p-2 overflow-hidden">
+      <div className="flex-1 overflow-hidden">
         {isEditing ? (
           <div
+            className="p-2 h-full"
             style={{ 
-              height: 'calc(100% - 20px)',
               display: 'flex',
               flexDirection: 'column'
             }}
@@ -375,9 +523,14 @@ export default function Card({
           </div>
         ) : (
           <div 
-            className={`prose prose-sm max-w-none h-full overflow-auto hover:bg-gray-50 card-content transition-colors ${
+            className={`prose prose-sm max-w-none h-full overflow-auto transition-colors ${
               connectingMode ? 'cursor-crosshair' : 'cursor-text'
             }`}
+            style={{
+              backgroundColor: 'transparent',
+              color: getTextColor(card.backgroundColor || '#ffffff'),
+              padding: 0
+            }}
             onClick={(e) => {
               console.log('Content area clicked!', { connectingMode, isEditing })
               
@@ -409,7 +562,33 @@ export default function Card({
               e.stopPropagation()
             }}
             title="Click to edit content"
-            dangerouslySetInnerHTML={{ __html: card.content || '<p class="text-gray-500 text-sm italic">Click to add content...</p>' }}
+            dangerouslySetInnerHTML={{ 
+              __html: `
+                <div class="card-content-${card.id}" style="background-color: ${card.backgroundColor || '#ffffff'}; color: ${getTextColor(card.backgroundColor || '#ffffff')}; min-height: 100%; padding: 8px;">
+                  <style>
+                    .card-content-${card.id} *,
+                    .card-content-${card.id} p,
+                    .card-content-${card.id} h1,
+                    .card-content-${card.id} h2,
+                    .card-content-${card.id} h3,
+                    .card-content-${card.id} h4,
+                    .card-content-${card.id} h5,
+                    .card-content-${card.id} h6,
+                    .card-content-${card.id} li,
+                    .card-content-${card.id} strong,
+                    .card-content-${card.id} em,
+                    .card-content-${card.id} span,
+                    .card-content-${card.id} div,
+                    .card-content-${card.id} blockquote,
+                    .card-content-${card.id} a {
+                      color: ${getTextColor(card.backgroundColor || '#ffffff')} !important;
+                      background-color: transparent !important;
+                    }
+                  </style>
+                  ${card.content || `<p class="text-sm italic" style="opacity: 0.7; color: ${getTextColor(card.backgroundColor || '#ffffff')};">Click to add content...</p>`}
+                </div>
+              `
+            }}
           />
         )}
       </div>
