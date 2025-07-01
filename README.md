@@ -9,6 +9,7 @@ A modern note-taking application with visual workspace capabilities, rich text e
 - **Rich Text Cards**: Create note cards with rich text editing capabilities
 - **Drag & Drop**: Drag and drop cards in a flexible grid layout
 - **Connections**: Create arrow and line connectors between cards
+- **Export/Import**: Complete data backup and restoration via JSON files
 - **IndexedDB Storage**: Client-side data storage using IndexedDB
 - **Responsive Design**: Modern, responsive UI with Tailwind CSS
 

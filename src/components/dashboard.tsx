@@ -6,6 +6,7 @@ import WorkspaceSelector from './workspace-selector'
 import WorkspaceCanvas from './workspace-canvas'
 import GlobalSearch from './global-search'
 import DocsModal from './docs-modal'
+import ExportImport from './export-import'
 import { LogOut, User, Book } from 'lucide-react'
 import { db } from '../lib/db'
 import { v4 as uuidv4 } from 'uuid'
@@ -140,6 +141,7 @@ export default function Dashboard() {
               <User size={16} />
               <span>{session.user?.name || session.user?.email}</span>
             </div>
+            <ExportImport onImportComplete={() => window.location.reload()} />
             <button
               onClick={() => setIsDocsOpen(true)}
               className="flex items-center gap-2 px-3 py-1 text-sm text-gray-600 hover:bg-gray-100 rounded-lg"

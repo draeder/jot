@@ -160,7 +160,7 @@ const docsContent: Section[] = [
               </ul>
             </div>
             <div>
-              <p><strong>Data Portability</strong>: Currently stored locally; future versions may include export/import features</p>
+              <p><strong>Data Portability</strong>: Use the Data button in the header to export/import all your workspace data as JSON files</p>
             </div>
           </div>
         )
@@ -1181,9 +1181,9 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
             <div>
               <h4 className="font-semibold text-lg mb-2">Current Backup Options:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
+                <li><strong>Export/Import</strong>: Use the Data button in the header to export all workspace data</li>
                 <li><strong>Browser Backup</strong>: Data tied to browser profile</li>
-                <li><strong>Manual Backup</strong>: Currently requires browser tools</li>
-                <li><strong>Export Feature</strong>: Planned for future versions</li>
+                <li><strong>JSON Format</strong>: Exported data in human-readable JSON format</li>
               </ul>
             </div>
             <div>
@@ -1203,11 +1203,11 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold text-lg mb-2">Future Features:</h4>
+              <h4 className="font-semibold text-lg mb-2">Data Export & Import:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>Export/Import</strong>: JSON export of all workspace data</li>
-                <li><strong>Cloud Sync</strong>: Optional cloud synchronization</li>
-                <li><strong>Backup Reminders</strong>: Notifications for data protection</li>
+                <li><strong>Export/Import</strong>: JSON export of all workspace data (✓ Available)</li>
+                <li><strong>Cloud Sync</strong>: Optional cloud synchronization (Future)</li>
+                <li><strong>Backup Reminders</strong>: Notifications for data protection (Future)</li>
               </ul>
             </div>
           </div>
@@ -1441,7 +1441,7 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
           <div className="space-y-4">
             <div>
               <h4 className="font-semibold text-lg mb-2">Sign-In Issues:</h4>
-              <ul className="list-disc list-inside space-y-1 ml-4">
+                           <ul className="list-disc list-inside space-y-1 ml-4">
                 <li><strong>Name Not Saving</strong>: Check if browser allows local storage</li>
                 <li><strong>Signed Out Unexpectedly</strong>: Browser may have cleared local data</li>
                 <li><strong>Can&apos;t Access</strong>: Try refreshing the page and signing in again</li>
@@ -1550,12 +1550,13 @@ Understanding how Jot stores and manages your data locally for privacy and perfo
               </ol>
             </div>
             <div>
-              <h4 className="font-semibold text-lg mb-2">Future Backup Features:</h4>
+              <h4 className="font-semibold text-lg mb-2">Export/Import Features:</h4>
               <ul className="list-disc list-inside space-y-1 ml-4">
-                <li><strong>JSON Export</strong>: Export all workspace data</li>
-                <li><strong>Selective Backup</strong>: Choose specific workspaces to backup</li>
-                <li><strong>Cloud Integration</strong>: Optional cloud storage synchronization</li>
-                <li><strong>Automatic Backups</strong>: Scheduled local backups</li>
+                <li><strong>JSON Export</strong>: Export all workspace data (✓ Available)</li>
+                <li><strong>Complete Backup</strong>: Includes all workspaces, cards, and connections (✓ Available)</li>
+                <li><strong>Selective Backup</strong>: Choose specific workspaces to backup (Future)</li>
+                <li><strong>Cloud Integration</strong>: Optional cloud storage synchronization (Future)</li>
+                <li><strong>Automatic Backups</strong>: Scheduled local backups (Future)</li>
               </ul>
             </div>
           </div>
