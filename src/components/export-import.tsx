@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
 import { Download, Upload, FileText, AlertCircle, CheckCircle } from 'lucide-react'
 import { db, User, Workspace, Card, Connection } from '@/lib/db'
@@ -104,15 +104,23 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
   }
 
   const importData = async (file: File, overwrite = false) => {
+    console.log('Starting import process, overwrite:', overwrite)
     if (!session?.user?.email) {
       setImportStatus({ type: 'error', message: 'Please sign in to import data' })
       return
     }
 
     setIsImporting(true)
+    let shouldCleanup = true
+    
     try {
       const fileContent = await file.text()
       const importData: ExportData = JSON.parse(fileContent)
+      console.log('Parsed import data:', { 
+        workspaces: importData.workspaces?.length || 0, 
+        cards: importData.cards?.length || 0, 
+        connections: importData.connections?.length || 0 
+      })
 
       // Validate import data structure
       if (!importData.version || !importData.user || !importData.workspaces || !importData.cards || !importData.connections) {
@@ -124,10 +132,16 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
       if (!currentUser) {
         throw new Error('Current user not found in database')
       }
+      console.log('Current user found:', currentUser.id)
 
       // Check for conflicts first
       let hasConflicts = false
       if (!overwrite) {
+        console.log('Checking for conflicts...')
+        const existingWorkspaces = await db.workspaces.where('userId').equals(currentUser.id).toArray()
+        console.log('Existing workspaces:', existingWorkspaces.map(ws => ws.name))
+        console.log('Import workspaces:', importData.workspaces.map(ws => ws.name))
+        
         for (const workspace of importData.workspaces) {
           const existingWorkspace = await db.workspaces
             .where('userId').equals(currentUser.id)
@@ -135,22 +149,29 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
             .first()
           
           if (existingWorkspace) {
+            console.log('Conflict found with workspace:', workspace.name, 'existing:', existingWorkspace.name)
             hasConflicts = true
             break
           }
         }
 
         if (hasConflicts) {
+          console.log('Conflicts detected, showing overwrite modal')
           // Show overwrite confirmation
-          setIsImporting(false)
           setPendingImportFile(file)
           setShowOverwriteConfirm(true)
           setShowDropdown(false)
+          setIsImporting(false)
+          shouldCleanup = false
           return
         }
+        console.log('No conflicts found, proceeding with import')
+      } else {
+        console.log('Overwrite mode enabled, skipping conflict check')
       }
 
       // Import workspaces (update userId to current user and generate new IDs)
+      console.log('Starting workspace import...')
       const workspaceIdMap = new Map<string, string>()
       for (const workspace of importData.workspaces) {
         const originalId = workspace.id
@@ -162,29 +183,35 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
           createdAt: new Date(workspace.createdAt),
           updatedAt: new Date()
         }
+        console.log('Importing workspace:', { 
+          originalName: workspace.name, 
+          originalId, 
+          newId: newWorkspaceId 
+        })
         
-        // Check if workspace with same name already exists
-        const existingWorkspace = await db.workspaces
-          .where('userId').equals(currentUser.id)
-          .and(ws => ws.name === newWorkspace.name)
-          .first()
-        
-        if (existingWorkspace && overwrite) {
-          // Delete existing workspace and its data
-          await db.transaction('rw', [db.workspaces, db.cards, db.connections], async () => {
-            // Delete all cards and connections for this workspace
-            await db.cards.where('workspaceId').equals(existingWorkspace.id).delete()
-            await db.connections.where('workspaceId').equals(existingWorkspace.id).delete()
-            // Delete the workspace
-            await db.workspaces.delete(existingWorkspace.id)
-          })
-        } else if (existingWorkspace && !overwrite) {
-          // Update name to avoid conflicts
-          newWorkspace.name = `${newWorkspace.name} (Imported ${new Date().toLocaleDateString()})`
+        // Only check for conflicts if we're in overwrite mode (conflicts already handled above)
+        if (overwrite) {
+          const existingWorkspace = await db.workspaces
+            .where('userId').equals(currentUser.id)
+            .and(ws => ws.name === newWorkspace.name)
+            .first()
+          
+          if (existingWorkspace) {
+            console.log('Overwriting existing workspace:', existingWorkspace.name)
+            // Delete existing workspace and its data
+            await db.transaction('rw', [db.workspaces, db.cards, db.connections], async () => {
+              // Delete all cards and connections for this workspace
+              await db.cards.where('workspaceId').equals(existingWorkspace.id).delete()
+              await db.connections.where('workspaceId').equals(existingWorkspace.id).delete()
+              // Delete the workspace
+              await db.workspaces.delete(existingWorkspace.id)
+            })
+          }
         }
 
         await db.workspaces.add(newWorkspace)
         workspaceIdMap.set(originalId, newWorkspaceId)
+        console.log('Successfully added workspace to database')
       }
 
       // Import cards (update workspaceId to new workspace IDs and generate new IDs)
@@ -235,9 +262,14 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
         message: `${overwrite ? 'Overwritten with' : 'Imported'} ${importData.workspaces.length} workspaces, ${importData.cards.length} cards, and ${importedConnections} connections` 
       })
       
+      console.log('Import completed successfully')
+      
       // Trigger refresh of parent components
       if (onImportComplete) {
+        console.log('Calling onImportComplete callback')
         onImportComplete()
+      } else {
+        console.log('No onImportComplete callback provided')
       }
 
     } catch (error) {
@@ -247,10 +279,15 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
         message: error instanceof Error ? error.message : 'Import failed' 
       })
     } finally {
-      setIsImporting(false)
-      setShowDropdown(false)
-      setPendingImportFile(null)
-      setShowOverwriteConfirm(false)
+      if (shouldCleanup) {
+        console.log('Import process finished, cleaning up state')
+        setIsImporting(false)
+        setShowDropdown(false)
+        setPendingImportFile(null)
+        setShowOverwriteConfirm(false)
+      } else {
+        console.log('Import process paused for user confirmation, not cleaning up')
+      }
     }
   }
 
@@ -272,6 +309,161 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
     }
   }
 
+  const handleMergeConfirm = () => {
+    if (pendingImportFile) {
+      setShowOverwriteConfirm(false)
+      importDataWithMerge(pendingImportFile)
+    }
+  }
+
+  const importDataWithMerge = async (file: File) => {
+    console.log('Starting merge import process')
+    if (!session?.user?.email) {
+      setImportStatus({ type: 'error', message: 'Please sign in to import data' })
+      return
+    }
+
+    setIsImporting(true)
+    
+    try {
+      const fileContent = await file.text()
+      const importData: ExportData = JSON.parse(fileContent)
+      console.log('Parsed merge import data:', { 
+        workspaces: importData.workspaces?.length || 0, 
+        cards: importData.cards?.length || 0, 
+        connections: importData.connections?.length || 0 
+      })
+
+      // Validate import data structure
+      if (!importData.version || !importData.user || !importData.workspaces || !importData.cards || !importData.connections) {
+        throw new Error('Invalid export file format')
+      }
+
+      // Get current user from database
+      const currentUser = await db.users.where('email').equals(session.user.email).first()
+      if (!currentUser) {
+        throw new Error('Current user not found in database')
+      }
+      console.log('Current user found for merge:', currentUser.id)
+
+      // Import workspaces with true merging (merge content into existing workspaces)
+      console.log('Starting merge workspace import...')
+      const workspaceIdMap = new Map<string, string>()
+      for (const workspace of importData.workspaces) {
+        const originalId = workspace.id
+        
+        // Check if workspace with same name already exists
+        const existingWorkspace = await db.workspaces
+          .where('userId').equals(currentUser.id)
+          .and(ws => ws.name === workspace.name)
+          .first()
+        
+        if (existingWorkspace) {
+          // Merge into existing workspace - use existing workspace ID
+          console.log('Merging into existing workspace:', existingWorkspace.name)
+          workspaceIdMap.set(originalId, existingWorkspace.id)
+          
+          // Update the existing workspace's updatedAt timestamp
+          await db.workspaces.update(existingWorkspace.id, {
+            updatedAt: new Date()
+          })
+        } else {
+          // Create new workspace (no conflict)
+          const newWorkspaceId = uuidv4() // Generate new UUID
+          const newWorkspace = {
+            ...workspace,
+            id: newWorkspaceId,
+            userId: currentUser.id,
+            createdAt: new Date(workspace.createdAt),
+            updatedAt: new Date()
+          }
+          
+          console.log('Creating new workspace (no conflict):', { 
+            originalName: workspace.name, 
+            originalId, 
+            newId: newWorkspaceId 
+          })
+
+          await db.workspaces.add(newWorkspace)
+          workspaceIdMap.set(originalId, newWorkspaceId)
+        }
+        
+        console.log('Successfully processed workspace for merge')
+      }
+
+      // Import cards (same as regular import)
+      const cardIdMap = new Map<string, string>()
+      for (const card of importData.cards) {
+        const originalId = card.id
+        const newCardId = uuidv4() // Generate new UUID
+        const newWorkspaceId = workspaceIdMap.get(card.workspaceId)
+        if (!newWorkspaceId) continue // Skip cards for workspaces that weren't imported
+
+        const newCard = {
+          ...card,
+          id: newCardId,
+          workspaceId: newWorkspaceId,
+          createdAt: new Date(card.createdAt),
+          updatedAt: new Date()
+        }
+
+        await db.cards.add(newCard)
+        cardIdMap.set(originalId, newCardId)
+      }
+
+      // Import connections (same as regular import)
+      let importedConnections = 0
+      for (const connection of importData.connections) {
+        const newConnectionId = uuidv4() // Generate new UUID
+        const newWorkspaceId = workspaceIdMap.get(connection.workspaceId)
+        const newFromCardId = cardIdMap.get(connection.fromCardId)
+        const newToCardId = cardIdMap.get(connection.toCardId)
+        
+        if (!newWorkspaceId || !newFromCardId || !newToCardId) continue // Skip connections with missing references
+
+        const newConnection = {
+          ...connection,
+          id: newConnectionId,
+          workspaceId: newWorkspaceId,
+          fromCardId: newFromCardId,
+          toCardId: newToCardId,
+          createdAt: new Date(connection.createdAt)
+        }
+
+        await db.connections.add(newConnection)
+        importedConnections++
+      }
+
+      setImportStatus({ 
+        type: 'success', 
+        message: `Merged ${importData.workspaces.length} workspaces, ${importData.cards.length} cards, and ${importedConnections} connections` 
+      })
+      
+      console.log('Merge import completed successfully')
+      
+      // Trigger refresh of parent components
+      if (onImportComplete) {
+        console.log('Calling onImportComplete callback after merge')
+        onImportComplete()
+      } else {
+        console.log('No onImportComplete callback provided')
+      }
+
+    } catch (error) {
+      console.error('Merge import error:', error)
+      setImportStatus({ 
+        type: 'error', 
+        message: error instanceof Error ? error.message : 'Merge import failed' 
+      })
+    } finally {
+      console.log('Merge import process finished, cleaning up state')
+      setIsImporting(false)
+      setShowDropdown(false)
+      setPendingImportFile(null)
+      setShowOverwriteConfirm(false)
+    }
+  }
+
   const handleOverwriteCancel = () => {
     setShowOverwriteConfirm(false)
     setPendingImportFile(null)
@@ -279,11 +471,15 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
   }
 
   // Clear status message after 5 seconds
-  if (importStatus.type) {
-    setTimeout(() => {
-      setImportStatus({ type: null, message: '' })
-    }, 5000)
-  }
+  useEffect(() => {
+    if (importStatus.type) {
+      const timer = setTimeout(() => {
+        setImportStatus({ type: null, message: '' })
+      }, 5000)
+      
+      return () => clearTimeout(timer)
+    }
+  }, [importStatus.type])
 
   return (
     <div className="relative">
@@ -361,17 +557,27 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
           <div className="bg-white rounded-lg p-6 max-w-md mx-4">
             <div className="flex items-center gap-3 mb-4">
               <AlertCircle className="text-yellow-500" size={24} />
-              <h3 className="text-lg font-semibold text-gray-900">Data Already Exists</h3>
+              <h3 className="text-lg font-semibold text-gray-900">Import Conflict Detected</h3>
             </div>
             
             <p className="text-gray-600 mb-6">
-              Some data in the import file already exists in your workspace. Would you like to overwrite the existing data?
+              Some workspaces in the import file have the same names as your existing workspaces. How would you like to handle this?
             </p>
             
-            <div className="bg-yellow-50 border border-yellow-200 rounded p-3 mb-6">
-              <p className="text-sm text-yellow-800">
-                <strong>Warning:</strong> Overwriting will permanently delete existing workspaces, cards, and connections with the same names/IDs and replace them with the imported data.
-              </p>
+            <div className="space-y-3 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded p-3">
+                <h4 className="font-semibold text-blue-900 mb-1">Merge (Recommended)</h4>
+                <p className="text-sm text-blue-800">
+                  Add imported cards to existing workspaces with matching names. Creates new workspaces for non-conflicting ones. No data is deleted.
+                </p>
+              </div>
+              
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-3">
+                <h4 className="font-semibold text-yellow-900 mb-1">Overwrite</h4>
+                <p className="text-sm text-yellow-800">
+                  <strong>Warning:</strong> Replace existing workspaces with the same names. This will permanently delete the existing data.
+                </p>
+              </div>
             </div>
             
             <div className="flex gap-3 justify-end">
@@ -382,10 +588,16 @@ export default function ExportImport({ onImportComplete }: ExportImportProps) {
                 Cancel
               </button>
               <button
+                onClick={handleMergeConfirm}
+                className="px-4 py-2 text-sm bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Merge Data
+              </button>
+              <button
                 onClick={handleOverwriteConfirm}
                 className="px-4 py-2 text-sm bg-red-500 text-white rounded hover:bg-red-600"
               >
-                Overwrite Data
+                Overwrite
               </button>
             </div>
           </div>
