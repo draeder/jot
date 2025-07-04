@@ -2,6 +2,7 @@
 
 # temporary ignore
 /ios
+/terraform
 
 # dependencies
 /node_modules

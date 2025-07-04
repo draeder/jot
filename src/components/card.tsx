@@ -564,7 +564,7 @@ export default function Card({
             title="Click to edit content"
             dangerouslySetInnerHTML={{ 
               __html: `
-                <div class="card-content-${card.id}" style="background-color: ${card.backgroundColor || '#ffffff'}; color: ${getTextColor(card.backgroundColor || '#ffffff')}; min-height: 100%; padding: 8px;">
+                <div class="card-content-${card.id}" style="background-color: ${card.backgroundColor || '#ffffff'}; color: ${getTextColor(card.backgroundColor || '#ffffff')}; min-height: 100%; padding: 20px;">
                   <style>
                     .card-content-${card.id} *,
                     .card-content-${card.id} p,
@@ -583,6 +583,43 @@ export default function Card({
                     .card-content-${card.id} a {
                       color: ${getTextColor(card.backgroundColor || '#ffffff')} !important;
                       background-color: transparent !important;
+                    }
+                    .card-content-${card.id} p {
+                      margin-bottom: 14px;
+                    }
+                    .card-content-${card.id} p:last-child {
+                      margin-bottom: 0;
+                    }
+                    .card-content-${card.id} h1, 
+                    .card-content-${card.id} h2, 
+                    .card-content-${card.id} h3, 
+                    .card-content-${card.id} h4, 
+                    .card-content-${card.id} h5, 
+                    .card-content-${card.id} h6 {
+                      margin-bottom: 10px;
+                      margin-top: 18px;
+                    }
+                    .card-content-${card.id} h1:first-child, 
+                    .card-content-${card.id} h2:first-child, 
+                    .card-content-${card.id} h3:first-child, 
+                    .card-content-${card.id} h4:first-child, 
+                    .card-content-${card.id} h5:first-child, 
+                    .card-content-${card.id} h6:first-child {
+                      margin-top: 0;
+                    }
+                    .card-content-${card.id} ul, 
+                    .card-content-${card.id} ol {
+                      margin-bottom: 14px;
+                      padding-left: 24px;
+                    }
+                    .card-content-${card.id} li {
+                      margin-bottom: 6px;
+                    }
+                    .card-content-${card.id} blockquote {
+                      margin: 14px 0;
+                      padding-left: 18px;
+                      border-left: 3px solid currentColor;
+                      opacity: 0.8;
                     }
                   </style>
                   ${card.content || `<p class="text-sm italic" style="opacity: 0.7; color: ${getTextColor(card.backgroundColor || '#ffffff')};">Click to add content...</p>`}
