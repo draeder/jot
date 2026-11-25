@@ -85,6 +85,19 @@ async function dropLinks(ws: string, ids: string[]): Promise<void> {
   await local.deleteLinks(ids)
 }
 
+/**
+ * A card or line is in its room now: marked so, if it is still here as it was sent (not deleted or
+ * changed again meanwhile: marking it then would bring it back, or undo the change).
+ */
+async function markSent(item: Card | Link): Promise<void> {
+  const isCard = 'content' in item
+  const here = (isCard ? await local.cards(item.ws) : await local.links(item.ws)).find((x) => x.id === item.id)
+  if (!here || here.at !== item.at || here.synced) return
+  const shown = (isCard ? cards.value : links.value) as (Card | Link)[]
+  if (item.ws === currentId.value && !shown.some((x) => x.id === item.id && x.at === item.at)) return
+  if (isCard) await keepCards([{ ...(here as Card), synced: true }]); else await keepLinks([{ ...(here as Link), synced: true }])
+}
+
 // Deletes made before a workspace's room was open: done there once it is (else the room would bring them back).
 const tombsKey = (ws: string) => `tombs:${ws}`
 async function tombs(ws: string): Promise<Record<string, number>> { return (await local.get<Record<string, number>>(tombsKey(ws))) ?? {} }
@@ -288,9 +301,7 @@ class Session {
     const isCard = 'content' in item
     try {
       await this.put(isCard ? cardKey(item.id) : linkKey(item.id), isCard ? cardRecord(item) : linkRecord(item as Link))
-      if (!item.synced) {
-        if (isCard) await keepCards([{ ...(item as Card), synced: true }]); else await keepLinks([{ ...(item as Link), synced: true }])
-      }
+      if (!item.synced) await markSent(item)
     } catch (error) { console.warn('jot: not sent:', error) }
   }
 
@@ -415,7 +426,9 @@ class Index {
     if (!this.room) return
     try {
       await this.room.put('public', indexKey(w.id), indexRecord(w))
-      if (!w.indexed) await saveWorkspace({ ...w, indexed: true }, false)
+      // Marked as in the account, if it is still here (not removed meanwhile).
+      const here = byId(workspaces.value, w.id)
+      if (here && !here.indexed) await saveWorkspace({ ...here, indexed: true }, false)
     } catch (error) { console.warn('jot: not kept in the account:', error) }
   }
 
