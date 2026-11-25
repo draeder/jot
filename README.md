@@ -25,7 +25,8 @@ Visual notes on an infinite canvas: cards with rich text, pictures and colours, 
 
 ```sh
 npm install
-npm run dev        # https://localhost:5173
+npm run dev        # http://localhost:5173
+npm run dev:lan    # https on every address (a phone on the LAN)
 npm test
 npm run deploy     # builds, then the Worker on jot.ooo (wrangler.jsonc)
 ```

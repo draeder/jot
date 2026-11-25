@@ -18,10 +18,13 @@ const pinned = (name: string): string | null => {
 }
 const build = `${commit} (PeerPigeon ${pinned('peerpigeon') ?? '?'}, freertc ${pinned('freertc') ?? '?'}), ${builtAt}`
 
+const lan = !!process.env.JOT_LAN
+
 export default defineConfig(({ command }) => ({
-  // The dev server over https (a certificate of its own, accepted once in the browser): the crypto PeerPigeon,
-  // unsea and PigeonIdP use is only given to secure pages, and a phone on the LAN reaches the page by its IP.
-  plugins: [vue(), ...(command === 'serve' ? [basicSsl()] : []), {
+  // `npm run dev`: http://localhost:5173 (a secure page to the browser, as localhost is). `npm run dev:lan`: over
+  // https (a certificate of its own, accepted once in the browser) on every address, for a phone on the LAN:
+  // the crypto PeerPigeon, unsea and PigeonIdP use is only given to secure pages.
+  plugins: [vue(), ...(command === 'serve' && lan ? [basicSsl()] : []), {
     // version.json names the build; open pages compare it with their own and
     // reload when a newer one is out (src/main.ts).
     name: 'build-version',
@@ -31,7 +34,7 @@ export default defineConfig(({ command }) => ({
   }],
   define: { __BUILD__: JSON.stringify(build) },
   resolve: { alias: { '@': resolve(__dirname, './src') } },
-  server: { port: 5173, host: true },
+  server: { port: 5173, host: lan },
   build: {
     chunkSizeWarningLimit: 1500,
     rollupOptions: { output: { manualChunks: { 'vue-core': ['vue'], editor: ['@tiptap/vue-3', '@tiptap/starter-kit'] } } },
