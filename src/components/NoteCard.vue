@@ -127,7 +127,7 @@ const saveNow = () => {
   emit('change', { content })
 }
 // Written as it is typed (a moment after each pause), so the people it is shared with see it.
-const saveSoon = () => { if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 700) }
+const saveSoon = () => { if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 350) }
 
 const insertFiles = (files: File[]): boolean => {
   const pictures = files.filter((f) => f.type.startsWith('image/'))

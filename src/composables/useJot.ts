@@ -19,7 +19,8 @@ import {
   parseCard, parseImport, parseIndex, parseLink, parseMeta, placeCard,
   type Card, type Link, type LinkKind, type Workspace,
 } from '@/lib/model'
-import { openRoom } from './useMesh'
+import { broadcast, onBroadcast, openRoom } from './useMesh'
+import { open as openLive, seal, topicIn, topicOf } from '@/lib/live'
 import { useIdentity } from './useIdentity'
 
 type Room = PeerPigeonStorage
@@ -120,6 +121,9 @@ class Session {
   mirror: Room | null = null
   private closed = false
   private watch: ReturnType<typeof setInterval> | null = null
+  /** The rooms' names: what live changes are sealed with (lib/live.ts). */
+  private roomName: string | null = null
+  private viewName: string | null = null
   private listener = (e: Change) => { if (e.origin === 'remote' && e.space === 'public') void this.remote(e) }
 
   constructor(readonly id: string) {}
@@ -137,12 +141,15 @@ class Session {
     syncState.value = { ...syncState.value, [this.id]: 'syncing' }
     try {
       if (ws.role === 'viewer' && ws.view) {
-        this.room = await openRoom(viewRoom(ws.id, ws.view.secret), { owner: ws.view.pub })
+        this.roomName = viewRoom(ws.id, ws.view.secret)
+        this.room = await openRoom(this.roomName, { owner: ws.view.pub })
       } else if (ws.secret) {
-        this.room = await openRoom(workspaceRoom(ws.id, ws.secret), { signingKeys: signing() })
+        this.roomName = workspaceRoom(ws.id, ws.secret)
+        this.room = await openRoom(this.roomName, { signingKeys: signing() })
         await this.openMirror()
       }
       if (this.closed) { await this.close(); return }
+      if (this.roomName) live.set(await topicOf(this.roomName), { session: this, room: this.roomName })
       this.room?.on('change', this.listener)
       await this.reconcile()
       this.markState()
@@ -165,12 +172,14 @@ class Session {
     const ws = this.ws
     const mine = keys.value?.pub
     if (!ws?.view || ws.role === 'viewer' || !mine || ws.view.pub !== mine || this.mirror) return
-    this.mirror = await openRoom(viewRoom(ws.id, ws.view.secret), { owner: mine, signingKeys: signing() })
+    this.viewName = viewRoom(ws.id, ws.view.secret)
+    this.mirror = await openRoom(this.viewName, { owner: mine, signingKeys: signing() })
   }
 
   async close(): Promise<void> {
     this.closed = true
     if (this.watch) clearInterval(this.watch)
+    for (const [t, l] of live) if (l.session === this) live.delete(t)
     this.room?.off('change', this.listener)
     await Promise.all([this.room?.close(), this.mirror?.close()].map((p) => p?.catch(() => {})))
     this.room = this.mirror = null
@@ -214,7 +223,7 @@ class Session {
       const r = remote.get(key)
       if (r && r.updatedAt > at) continue // changed there since: theirs stands
       if (r) await room.delete('public', key).catch(() => {})
-      void this.mirror?.delete('public', key).catch(() => {})
+      this.toMirror(key, null)
       remote.delete(key)
       doneTombs.push(key)
     }
@@ -261,7 +270,7 @@ class Session {
     if (e.key === META_KEY && e.op === 'upsert') {
       const meta = parseMeta(e.record?.value, now)
       if (meta && meta.at > (ws.nameAt ?? 0)) await saveWorkspace({ ...ws, name: meta.name, nameAt: meta.at, at: Math.max(ws.at, meta.at) }, !this.reader)
-      if (meta) void this.mirror?.put('public', META_KEY, { name: meta.name, at: meta.at }).catch(() => {})
+      if (meta) this.toMirror(META_KEY, { name: meta.name, at: meta.at })
       return
     }
     const isCard = e.key.startsWith('jot/c/'), isLink = e.key.startsWith('jot/k/')
@@ -269,7 +278,7 @@ class Session {
     if (e.op === 'delete') {
       const id = e.key.slice(6)
       if (isCard) await dropCards(this.id, [id]); else await dropLinks(this.id, [id])
-      void this.mirror?.delete('public', e.key).catch(() => {})
+      this.toMirror(e.key, null)
       return
     }
     if (isCard) {
@@ -277,22 +286,41 @@ class Session {
       const here = card && (await local.cards(this.id)).find((c) => c.id === card.id)
       if (card && (!here || card.at >= here.at)) {
         await keepCards([{ ...card, synced: true }])
-        void this.mirror?.put('public', e.key, cardRecord(card)).catch(() => {})
+        this.toMirror(e.key, cardRecord(card))
       }
     } else {
       const link = parseLink(this.id, e.key, e.record?.value, now)
       const here = link && (await local.links(this.id)).find((l) => l.id === link.id)
       if (link && (!here || link.at >= here.at)) {
         await keepLinks([{ ...link, synced: true }])
-        void this.mirror?.put('public', e.key, linkRecord(link)).catch(() => {})
+        this.toMirror(e.key, linkRecord(link))
       }
     }
   }
 
+  /** A change to the published copy (its room, and the pages reading it now). */
+  private toMirror(key: string, value: Record<string, unknown> | null): void {
+    if (!this.mirror || !this.viewName) return
+    void (value ? this.mirror.put('public', key, value) : this.mirror.delete('public', key)).catch(() => {})
+    void this.tell(this.viewName, key, value)
+  }
+
+  /** A change, to the other pages that have this room open now (the servers pass it on more slowly). */
+  private async tell(room: string, key: string, value: Record<string, unknown> | null): Promise<void> {
+    try { broadcast(await seal(room, { key, value, at: Number(value?.at) || Date.now() })) } catch { /* the servers have it */ }
+  }
+
+  /** A change heard from another page with this room open. */
+  async heard(key: string, value: Record<string, unknown> | null): Promise<void> {
+    if (this.closed) return
+    await this.remote({ origin: 'remote', op: value ? 'upsert' : 'delete', record: value ? { key, value } : null, space: 'public', key })
+  }
+
   async put(key: string, value: Record<string, unknown>): Promise<void> {
     if (this.reader || !this.room) return
+    if (this.roomName) void this.tell(this.roomName, key, value)
     await this.room.put('public', key, value)
-    void this.mirror?.put('public', key, value).catch(() => {})
+    this.toMirror(key, value)
   }
 
   /** A card or line changed here: to the room, and marked as there. */
@@ -310,8 +338,9 @@ class Session {
     if (!this.room) { await addTombs(this.id, keys); return }
     await addTombs(this.id, keys)
     for (const key of keys) {
+      if (this.roomName) void this.tell(this.roomName, key, null)
       await this.room.delete('public', key).catch(() => {})
-      void this.mirror?.delete('public', key).catch(() => {})
+      this.toMirror(key, null)
     }
     await clearTombs(this.id, keys)
   }
@@ -348,6 +377,14 @@ class Session {
 
 const sessions = new Map<string, Session>()
 let mesh = false
+/** The rooms open here, by their live topic (lib/live.ts). */
+const live = new Map<string, { session: Session; room: string }>()
+onBroadcast((data) => {
+  const t = topicIn(data)
+  const l = t ? live.get(t) : undefined
+  if (!l) return
+  void openLive(l.room, data).then((change) => { if (change) void l.session.heard(change.key, change.value) })
+})
 // For looking at a running page from the console; read-only by intent.
 ;(globalThis as Record<string, unknown>).__jotSync = { sessions, syncState }
 

@@ -73,6 +73,10 @@ export function startMesh(network = 'global', urls: string[] = signalingUrls()):
   n.on('peerConnected', () => { connected.value = true; refresh() })
   n.on('peerDisconnected', () => refresh())
   n.on('error', (err: Error) => console.warn('PeerPigeon:', err?.message ?? err))
+  n.on('message', (m: { kind?: string; local?: boolean; data?: unknown }) => {
+    if (m.kind !== 'broadcast' || m.local) return
+    for (const h of listeners) { try { h(m.data) } catch { /* that listener's */ } }
+  })
   started = n.start().then(() => {
     // Signed in before the mesh was up: sign as the account from the start.
     if (accountKeys) n.storage?.signAs(accountKeys)
@@ -160,6 +164,20 @@ export async function openRoom(name: string, options: { signingKeys?: { pub: str
   await started
   if (!node) throw new Error('Not connected')
   return node.openStorage(name, options)
+}
+
+const listeners = new Set<(data: unknown) => void>()
+
+/** Something to everyone in jot's room on the mesh (false: not on the mesh now). */
+export function broadcast(data: unknown): boolean {
+  if (!node) return false
+  try { node.broadcast(data); return true } catch { return false }
+}
+
+/** What others broadcast in jot's room. */
+export function onBroadcast(handler: (data: unknown) => void): () => void {
+  listeners.add(handler)
+  return () => { listeners.delete(handler) }
 }
 
 /** Whether this page has reached any storage server. */
