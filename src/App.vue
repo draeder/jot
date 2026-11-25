@@ -34,8 +34,7 @@
 
     <main v-if="page === 'app'" class="main">
       <WorkspaceList :open="showList" @picked="showList = false">
-        <p class="build" :title="`Jot ${build}. Peer to peer on PeerPigeon.`">Jot {{ shortBuild }}</p>
-        <p v-if="relay" class="build" :title="relay">{{ /relay/.test(relay) ? relay : `relay ${relay}` }}</p>
+        <p class="build" :title="buildTitle">Jot {{ shortBuild }}</p>
         <p class="phone-only"><a href="#" @click.prevent="sheet = 'data'; showList = false">Export and import</a> · <a href="#" @click.prevent="sheet = 'help'; showList = false">How jot works</a></p>
         <p><a href="/privacy" @click.prevent="go('privacy')">Privacy</a> · <a href="/terms" @click.prevent="go('terms')">Terms</a></p>
       </WorkspaceList>
@@ -76,6 +75,7 @@ declare const __BUILD__: string
 const build = __BUILD__
 // The footer shows the commit and when it was built; the rest (the packages' commits) on hover.
 const shortBuild = build.replace(/\s*\([^)]*\)/, '')
+const buildTitle = computed(() => `Jot ${build}\nPeer to peer on PeerPigeon${relay.value ? ` · ${/relay/.test(relay.value) ? relay.value : `relay ${relay.value}`}` : ''}`)
 
 const { connected, starting, error: meshError, relay } = useMesh()
 const { account } = useIdentity()
