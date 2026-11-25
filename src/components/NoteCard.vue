@@ -6,10 +6,13 @@
     @pointerdown="$emit('press', $event)"
   >
     <header class="card-head" @pointerdown="startMove">
-      <input
-        v-if="naming" ref="titleInput" v-model="title" class="title-input" :size="Math.max(4, title.length + 1)" :maxlength="MAX_TITLE" aria-label="Card title"
-        @keydown.enter.prevent="saveTitle" @keydown.esc.prevent="naming = false" @blur="saveTitle" @pointerdown.stop
-      />
+      <!-- The box is as wide as what is in it: a hidden copy of the text sizes it. -->
+      <span v-if="naming" class="title-fit" :data-text="title">
+        <input
+          ref="titleInput" v-model="title" class="title-input" size="1" :maxlength="MAX_TITLE" aria-label="Card title"
+          @keydown.enter.prevent="saveTitle" @keydown.esc.prevent="naming = false" @blur="saveTitle" @pointerdown.stop
+        />
+      </span>
       <h3 v-else class="title" :class="{ renamable: canEdit }" :title="canEdit ? 'Click to rename' : undefined" @pointerdown="titlePress = [$event.clientX, $event.clientY]" @click="onTitleClick" @dblclick.stop>{{ card.title || 'Untitled' }}</h3>
       <div v-if="canEdit" class="head-tools" @pointerdown.stop>
         <button class="tool" title="Card colour" aria-label="Card colour" :aria-expanded="picking" @click="picking = !picking"><Icon name="palette" /></button>
@@ -269,8 +272,11 @@ const buttons = computed(() => {
 .card-head { position: relative; display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.5rem 0.45rem 0.85rem; border-bottom: 1px solid rgba(127, 127, 127, 0.22); cursor: grab; touch-action: none; }
 .note-card.linking .card-head { cursor: crosshair; }
 .title.renamable { cursor: text; }
-.title { flex: 0 1 auto; min-width: 0; font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.title-input { flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; padding: 0.2rem 0.4rem; font-weight: 700; font-size: 0.95rem; }
+.title { flex: 0 1 auto; min-width: 0; line-height: 1.4; padding: 1px 5px; border: 1px solid transparent; margin-left: -6px; font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-fit { flex: 0 1 auto; min-width: 0; max-width: calc(100% + 6px); display: inline-grid; margin-left: -6px; }
+.title-fit::after { content: attr(data-text) ' '; visibility: hidden; white-space: pre; overflow: hidden; }
+.title-fit::after, .title-input { grid-area: 1 / 1; font: inherit; font-size: 0.95rem; font-weight: 700; line-height: 1.4; padding: 1px 5px; border: 1px solid transparent; border-radius: 4px; min-width: 2ch; }
+.title-input { width: 100%; border-color: var(--sheen); }
 .head-tools { margin-left: auto; display: flex; gap: 0.1rem; opacity: 0; transition: opacity 0.12s; }
 .note-card:hover .head-tools, .note-card.selected .head-tools, .head-tools:focus-within { opacity: 1; }
 .tool { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius); color: inherit; opacity: 0.75; }
