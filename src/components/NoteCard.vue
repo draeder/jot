@@ -111,9 +111,11 @@ const setColor = (c: string | undefined) => { picking.value = false; emit('chang
 // ---------- the note
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
+let written: string | null = null
 const saveNow = () => {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
-  const html = editor.value?.getHTML() ?? ''
+  // The note as last written (the editor may be gone by now: a card closing as it is deleted).
+  const html = written ?? props.card.content
   const content = html === '<p></p>' ? '' : html
   if (content === props.card.content) return
   if (content.length > MAX_CONTENT) { error.value = 'This note is too long to keep: make it shorter, or split it into another card.'; return }
@@ -157,14 +159,14 @@ const editor = useEditor({
     handlePaste: (_view, event) => insertFiles([...(event.clipboardData?.files ?? [])]),
     handleDrop: (_view, event) => insertFiles([...((event as DragEvent).dataTransfer?.files ?? [])]),
   },
-  onUpdate: () => { if (editing.value) saveSoon(); else saveNow() },
+  onUpdate: ({ editor: e }) => { written = e.getHTML(); if (editing.value) saveSoon(); else saveNow() },
 })
 
 // A change made elsewhere (another device, someone it is shared with): shown, unless it is being written here.
 watch(() => props.card.content, (content) => {
   const e = editor.value
   if (!e || editing.value) return
-  if (e.getHTML() !== content && !(content === '' && e.isEmpty)) e.commands.setContent(content, { emitUpdate: false })
+  if (e.getHTML() !== content && !(content === '' && e.isEmpty)) { e.commands.setContent(content, { emitUpdate: false }); written = null }
 })
 watch(() => props.card.title, (t) => { if (!naming.value) title.value = t })
 
@@ -214,7 +216,8 @@ watch(() => props.selected, (on) => { if (!on) { stopEditing(); picking.value = 
 watch(() => props.canEdit, (can) => { if (!can) stopEditing() })
 defineExpose({ stopEditing, startEditing })
 
-onBeforeUnmount(() => { if (editing.value) saveNow(); editor.value?.destroy() })
+// What was being written is kept (useEditor destroys the editor itself).
+onBeforeUnmount(() => { if (editing.value) saveNow() })
 
 // ---------- the formatting buttons
 
