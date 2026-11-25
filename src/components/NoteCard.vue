@@ -149,6 +149,9 @@ const insertFiles = (files: File[]): boolean => {
   return true
 }
 
+/** Where the caret was before ⌘A selected all of the note (a second ⌘A puts it back). */
+let caretBeforeAll: { anchor: number; head: number } | null = null
+
 const editor = useEditor({
   content: props.card.content,
   editable: false,
@@ -164,6 +167,22 @@ const editor = useEditor({
     JotImage,
   ],
   editorProps: {
+    // ⌘A or Ctrl+A: all of the note, and again, none (the caret back where it was).
+    handleKeyDown: (view, event) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey || event.key.toLowerCase() !== 'a') return false
+      const { state } = view
+      const { from, to } = state.selection
+      const all = state.selection instanceof AllSelection || (from <= Selection.atStart(state.doc).from && to >= Selection.atEnd(state.doc).to)
+      if (all) {
+        const end = state.doc.content.size
+        const back = caretBeforeAll
+        view.dispatch(state.tr.setSelection(back ? TextSelection.between(state.doc.resolve(Math.min(back.anchor, end)), state.doc.resolve(Math.min(back.head, end))) : Selection.atEnd(state.doc)))
+      } else {
+        caretBeforeAll = { anchor: state.selection.anchor, head: state.selection.head }
+        view.dispatch(state.tr.setSelection(new AllSelection(state.doc)))
+      }
+      return true
+    },
     handlePaste: (_view, event) => insertFiles([...(event.clipboardData?.files ?? [])]),
     handleDrop: (_view, event) => insertFiles([...((event as DragEvent).dataTransfer?.files ?? [])]),
   },
@@ -237,6 +256,7 @@ function selectNote(): void {
   if (!e || e.isDestroyed) return
   if (props.canEdit && !props.linking) {
     if (!editing.value) startEditing()
+    caretBeforeAll = { anchor: e.state.selection.anchor, head: e.state.selection.head }
     e.view.dispatch(e.state.tr.setSelection(new AllSelection(e.state.doc)))
     e.view.focus()
     return

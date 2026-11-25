@@ -406,15 +406,16 @@ function onKey(e: KeyboardEvent): void {
     if (!typing) { selectedCard.value = null; selectedLink.value = null; group.value = [] }
     return
   }
-  // ⌘A or Ctrl+A: in a note or a title, what is in it (the browser's own); a card picked, its note; on the
-  // canvas, every card. Not the whole page.
+  // ⌘A or Ctrl+A: in a note, all of it (NoteCard); a card picked, its note; on the canvas, every card, and
+  // again, none. Not the whole page.
   if (mod && e.key.toLowerCase() === 'a' && !typing && !linking.value) {
     const onCanvas = !t || t === document.body || !!t.closest('.canvas-wrap')
     if (!onCanvas) return
     e.preventDefault()
     if (selectedCard.value && cardRefs.has(selectedCard.value)) { cardRefs.get(selectedCard.value)!.selectNote(); return }
     selectedLink.value = null
-    group.value = cards.value.map((c) => c.id)
+    const all = cards.value.map((c) => c.id)
+    group.value = all.length && all.every((id) => group.value.includes(id)) ? [] : all
     return
   }
   if (typing || !editable.value) return
