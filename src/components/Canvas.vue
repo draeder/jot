@@ -44,9 +44,9 @@
         <NoteCard
           v-for="c in cards" :key="c.id" :ref="(el) => keepCardRef(c.id, el)"
           :card="c" :x="shown(c).x" :y="shown(c).y" :w="shown(c).w" :h="shown(c).h" :zoom="view.zoom"
-          :selected="c.id === selectedCard" :linking="linking" :can-edit="editable"
+          :selected="c.id === selectedCard || group.includes(c.id)" :linking="linking" :can-edit="editable"
           :class="{ 'link-from': c.id === linkFrom }"
-          @press="onCardPress(c.id)" @move="startMove(c, $event)" @resize="startResize(c, $event)"
+          @press="onCardPress(c.id, $event)" @move="startMove(c, $event)" @resize="startResize(c, $event)"
           @delete="removeCard(c.id)" @change="(patch) => updateCard(c.id, patch)" @editing="(on) => onEditing(c.id, on)"
         />
       </div>
@@ -74,7 +74,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch, type ComponentPublicInstance } from 'vue'
 import Icon from './Icon.vue'
 import NoteCard from './NoteCard.vue'
-import { addCard, addLink, deleteCard, deleteLink, redo, undo, updateCard, updateLink, useJot } from '@/composables/useJot'
+import { addCard, addLink, deleteCard, deleteCards, deleteLink, moveCards, redo, undo, updateCard, updateLink, useJot } from '@/composables/useJot'
 import { GRID, MIN_H, MIN_W, bounds, edgePoints, snap, type Card } from '@/lib/model'
 
 const { cards, links, current, currentId, history, editable, loaded, syncState } = useJot()
@@ -83,6 +83,8 @@ const state = computed(() => (currentId.value ? syncState.value[currentId.value]
 const pane = ref<HTMLElement | null>(null)
 const selectedCard = ref<string | null>(null)
 const selectedLink = ref<string | null>(null)
+/** Every card picked at once (⌘A or Ctrl+A on the canvas): moved or deleted together. */
+const group = ref<string[]>([])
 const editingCard = ref<string | null>(null)
 const linking = ref(false)
 const linkFrom = ref<string | null>(null)
@@ -98,6 +100,7 @@ watch(view, () => { if (keepTimer) clearTimeout(keepTimer); keepTimer = setTimeo
 
 watch(currentId, (id) => {
   selectedCard.value = selectedLink.value = linkFrom.value = null
+  group.value = []
   linking.value = false
   let kept: { x: number; y: number; zoom: number } | null = null
   try { kept = id ? JSON.parse(localStorage.getItem(viewKey(id)) ?? 'null') : null } catch { kept = null }
@@ -179,11 +182,11 @@ function goTo(d: Dir): void {
 
 // ---------- moving, resizing, panning
 
-const drag = ref<{ id: string; dx: number; dy: number; dw: number; dh: number } | null>(null)
+const drag = ref<{ ids: string[]; dx: number; dy: number; dw: number; dh: number } | null>(null)
 const panDrag = ref(false)
 
 const shown = (c: Card) => {
-  const d = drag.value?.id === c.id ? drag.value : null
+  const d = drag.value?.ids.includes(c.id) ? drag.value : null
   return d ? { x: c.x + d.dx, y: c.y + d.dy, w: Math.max(MIN_W, c.w + d.dw), h: Math.max(MIN_H, c.h + d.dh) } : { x: c.x, y: c.y, w: c.w, h: c.h }
 }
 
@@ -210,12 +213,28 @@ function follow(e: PointerEvent, onMove: (dx: number, dy: number) => void, onUp:
 function startMove(c: Card, e: PointerEvent): void {
   // Connecting: the press picks the card (onCardPress), it doesn't move it.
   if (e.button !== 0 || linking.value) return
-  selectedCard.value = c.id
   selectedLink.value = null
+  // One of the picked cards: they all move (a click without moving picks just this one).
+  if (group.value.length > 1 && group.value.includes(c.id)) {
+    if (!editable.value) return
+    e.preventDefault()
+    const ids = [...group.value]
+    const z = view.value.zoom
+    follow(e, (dx, dy) => { drag.value = { ids, dx: dx / z, dy: dy / z, dw: 0, dh: 0 } }, (moved) => {
+      const d = drag.value
+      drag.value = null
+      if (moved && d) {
+        void moveCards(cards.value.filter((x) => ids.includes(x.id)).map((x) => ({ id: x.id, x: snap(x.x + d.dx, snapOn.value), y: snap(x.y + d.dy, snapOn.value) })))
+      } else if (!moved) { group.value = []; selectedCard.value = c.id }
+    })
+    return
+  }
+  group.value = []
+  selectedCard.value = c.id
   if (!editable.value) return
   e.preventDefault()
   const z = view.value.zoom
-  follow(e, (dx, dy) => { drag.value = { id: c.id, dx: dx / z, dy: dy / z, dw: 0, dh: 0 } }, (moved) => {
+  follow(e, (dx, dy) => { drag.value = { ids: [c.id], dx: dx / z, dy: dy / z, dw: 0, dh: 0 } }, (moved) => {
     const d = drag.value
     drag.value = null
     if (moved && d) void updateCard(c.id, { x: snap(c.x + d.dx, snapOn.value), y: snap(c.y + d.dy, snapOn.value) })
@@ -225,9 +244,10 @@ function startMove(c: Card, e: PointerEvent): void {
 function startResize(c: Card, e: PointerEvent): void {
   if (e.button !== 0 || !editable.value) return
   e.preventDefault()
+  group.value = []
   selectedCard.value = c.id
   const z = view.value.zoom
-  follow(e, (dx, dy) => { drag.value = { id: c.id, dx: 0, dy: 0, dw: dx / z, dh: dy / z } }, (moved) => {
+  follow(e, (dx, dy) => { drag.value = { ids: [c.id], dx: 0, dy: 0, dw: dx / z, dh: dy / z } }, (moved) => {
     const d = drag.value
     drag.value = null
     if (moved && d) void updateCard(c.id, { w: Math.max(MIN_W, snap(c.w + d.dw, snapOn.value)), h: Math.max(MIN_H, snap(c.h + d.dh, snapOn.value)) })
@@ -306,12 +326,16 @@ function addAtView(): void {
 
 function clearSelection(): void {
   if (linking.value) { linkFrom.value = null; return }
+  group.value = []
   selectedCard.value = null
   selectedLink.value = null
 }
 
-function onCardPress(id: string): void {
+function onCardPress(id: string, e?: PointerEvent): void {
   if (linking.value) { pickForLink(id); return }
+  // A press on a picked card's title bar may move them all (startMove); anywhere else in it, just that card.
+  if (group.value.includes(id) && (e?.target as HTMLElement | null)?.closest('.card-head')) return
+  group.value = []
   if (selectedCard.value !== id) {
     // Writing in another card: that one is done.
     if (editingCard.value && editingCard.value !== id) cardRefs.get(editingCard.value)?.stopEditing()
@@ -359,9 +383,10 @@ const linkMenu = computed(() => {
 const removeCard = (id: string) => { if (selectedCard.value === id) selectedCard.value = null; void deleteCard(id) }
 const removeLink = (id: string) => { selectedLink.value = null; void deleteLink(id) }
 
-const cardRefs = new Map<string, { stopEditing: () => void }>()
+type CardRef = { stopEditing: () => void; selectNote: () => void }
+const cardRefs = new Map<string, CardRef>()
 const keepCardRef = (id: string, el: Element | ComponentPublicInstance | null) => {
-  if (el) cardRefs.set(id, el as unknown as { stopEditing: () => void }); else cardRefs.delete(id)
+  if (el) cardRefs.set(id, el as unknown as CardRef); else cardRefs.delete(id)
 }
 const onEditing = (id: string, on: boolean) => {
   editingCard.value = on ? id : editingCard.value === id ? null : editingCard.value
@@ -378,14 +403,25 @@ function onKey(e: KeyboardEvent): void {
   if (e.key === 'Escape') {
     if (editingCard.value) { cardRefs.get(editingCard.value)?.stopEditing(); return }
     if (linking.value) { toggleLinking(); return }
-    if (!typing) { selectedCard.value = null; selectedLink.value = null }
+    if (!typing) { selectedCard.value = null; selectedLink.value = null; group.value = [] }
+    return
+  }
+  // ⌘A or Ctrl+A: in a note or a title, what is in it (the browser's own); a card picked, its note; on the
+  // canvas, every card. Not the whole page.
+  if (mod && e.key.toLowerCase() === 'a' && !typing && !linking.value) {
+    const onCanvas = !t || t === document.body || !!t.closest('.canvas-wrap')
+    if (!onCanvas) return
+    e.preventDefault()
+    if (selectedCard.value && cardRefs.has(selectedCard.value)) { cardRefs.get(selectedCard.value)!.selectNote(); return }
+    selectedLink.value = null
+    group.value = cards.value.map((c) => c.id)
     return
   }
   if (typing || !editable.value) return
   if (mod && e.key.toLowerCase() === 'z') { e.preventDefault(); void (e.shiftKey ? redo() : undo()); return }
   if (mod && e.key.toLowerCase() === 'y') { e.preventDefault(); void redo(); return }
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    if (selectedLink.value) { e.preventDefault(); removeLink(selectedLink.value) } else if (selectedCard.value) { e.preventDefault(); removeCard(selectedCard.value) }
+    if (selectedLink.value) { e.preventDefault(); removeLink(selectedLink.value) } else if (group.value.length) { e.preventDefault(); const ids = group.value; group.value = []; void deleteCards(ids) } else if (selectedCard.value) { e.preventDefault(); removeCard(selectedCard.value) }
   }
 }
 onMounted(() => window.addEventListener('keydown', onKey))

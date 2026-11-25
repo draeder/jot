@@ -774,6 +774,25 @@ export async function deleteCard(id: string): Promise<void> {
   await apply([{ card: { id, before, after: null } }, ...attached.map((l) => ({ link: { id: l.id, before: l, after: null } }))])
 }
 
+/** Several cards (and their lines) deleted: one undo step. */
+export async function deleteCards(ids: string[]): Promise<void> {
+  const gone = new Set(ids)
+  const before = cards.value.filter((c) => gone.has(c.id))
+  if (!before.length) return
+  const attached = links.value.filter((l) => gone.has(l.from) || gone.has(l.to))
+  await apply([...before.map((c) => ({ card: { id: c.id, before: c, after: null } })), ...attached.map((l) => ({ link: { id: l.id, before: l, after: null } }))])
+}
+
+/** Several cards moved together: one undo step. */
+export async function moveCards(moves: { id: string; x: number; y: number }[]): Promise<void> {
+  const steps: Step[] = []
+  for (const m of moves) {
+    const before = byId(cards.value, m.id)
+    if (before && (before.x !== m.x || before.y !== m.y)) steps.push({ card: { id: m.id, before, after: { ...before, x: m.x, y: m.y } } })
+  }
+  await apply(steps)
+}
+
 export async function addLink(from: string, to: string, kind: LinkKind = 'arrow'): Promise<void> {
   const ws = currentId.value
   if (!ws || from === to) return

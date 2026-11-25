@@ -49,7 +49,7 @@ import { TaskItem, TaskList } from '@tiptap/extension-list'
 import { Placeholder } from '@tiptap/extensions'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
-import { Selection, TextSelection } from '@tiptap/pm/state'
+import { AllSelection, Selection, TextSelection } from '@tiptap/pm/state'
 import Icon from './Icon.vue'
 import { JotImage } from '@/lib/jot-image'
 import { addImage } from '@/lib/images'
@@ -231,9 +231,27 @@ function stopEditing(): void {
   // What arrived from elsewhere while this was open, if nothing typed here replaced it.
   if (!saved) showArrived(props.card.content)
 }
+/** ⌘A or Ctrl+A on a picked card: all of its note (opened for writing, where it can be edited). */
+function selectNote(): void {
+  const e = editor.value
+  if (!e || e.isDestroyed) return
+  if (props.canEdit && !props.linking) {
+    if (!editing.value) startEditing()
+    e.view.dispatch(e.state.tr.setSelection(new AllSelection(e.state.doc)))
+    e.view.focus()
+    return
+  }
+  // Read only: the words selected on the page, to copy.
+  const range = document.createRange()
+  range.selectNodeContents(e.view.dom)
+  const sel = window.getSelection()
+  sel?.removeAllRanges()
+  sel?.addRange(range)
+}
+
 watch(() => props.selected, (on) => { if (!on) { stopEditing(); picking.value = false } })
 watch(() => props.canEdit, (can) => { if (!can) stopEditing() })
-defineExpose({ stopEditing, startEditing })
+defineExpose({ stopEditing, startEditing, selectNote })
 
 // What was being written is kept (useEditor destroys the editor itself).
 onBeforeUnmount(() => { if (editing.value) saveNow() })
