@@ -7,7 +7,7 @@
       <ul>
         <li><b>New card:</b> the <b>Card</b> button, or double-click anywhere on the canvas.</li>
         <li><b>Write:</b> click a card’s note. The bar above it formats; paste or drop a picture to add it.</li>
-        <li><b>Rename:</b> double-click a card’s title. <b>Move:</b> drag its title bar. <b>Resize:</b> drag its corner.</li>
+        <li><b>Rename:</b> click a card’s title. <b>Move:</b> drag its title bar. <b>Resize:</b> drag its corner.</li>
         <li><b>Colour</b> and <b>delete:</b> the buttons on its title bar.</li>
         <li><b>Connect:</b> <b>Connect</b>, then pick two cards. Click a line to make it an arrow or a plain line, turn it around, or delete it.</li>
       </ul>

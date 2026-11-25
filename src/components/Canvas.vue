@@ -292,7 +292,8 @@ function onWheel(e: WheelEvent): void {
 
 function addAtView(): void {
   const s = paneSize()
-  const w = toWorld(40, 40)
+  // Below the toolbar, which floats over the canvas's top left.
+  const w = toWorld(40, 96)
   void addCard(snap(w.x, snapOn.value), snap(w.y, snapOn.value)).then((c) => {
     if (!c) return
     selectedCard.value = c.id

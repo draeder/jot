@@ -10,7 +10,7 @@
         v-if="naming" ref="titleInput" v-model="title" class="title-input" :maxlength="MAX_TITLE" aria-label="Card title"
         @keydown.enter.prevent="saveTitle" @keydown.esc.prevent="naming = false" @blur="saveTitle" @pointerdown.stop
       />
-      <h3 v-else class="title" :title="canEdit ? 'Double-click to rename' : undefined" @dblclick.stop="startNaming">{{ card.title || 'Untitled' }}</h3>
+      <h3 v-else class="title" :class="{ renamable: canEdit }" :title="canEdit ? 'Click to rename' : undefined" @pointerdown="titlePress = [$event.clientX, $event.clientY]" @click="onTitleClick" @dblclick.stop>{{ card.title || 'Untitled' }}</h3>
       <div v-if="canEdit" class="head-tools" @pointerdown.stop>
         <button class="tool" title="Card colour" aria-label="Card colour" :aria-expanded="picking" @click="picking = !picking"><Icon name="palette" /></button>
         <button class="tool" title="Delete card" aria-label="Delete card" @click="$emit('delete')"><Icon name="trash" /></button>
@@ -84,6 +84,14 @@ const uploading = ref(false)
 
 const startMove = (e: PointerEvent) => { if (!naming.value) emit('move', e) }
 const startResize = (e: PointerEvent) => emit('resize', e)
+
+// A click on the title renames the card; a drag on it (the title bar) moves the card instead.
+const titlePress = ref<[number, number] | null>(null)
+const onTitleClick = (e: MouseEvent) => {
+  const p = titlePress.value
+  titlePress.value = null
+  if (p && Math.hypot(e.clientX - p[0], e.clientY - p[1]) < 4 && !props.linking) void startNaming()
+}
 
 const startNaming = async () => {
   if (!props.canEdit) return
@@ -257,6 +265,7 @@ const buttons = computed(() => {
 
 .card-head { position: relative; display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.5rem 0.45rem 0.85rem; border-bottom: 1px solid rgba(127, 127, 127, 0.22); cursor: grab; touch-action: none; }
 .note-card.linking .card-head { cursor: crosshair; }
+.title.renamable { cursor: text; }
 .title { flex: 1; min-width: 0; font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .title-input { flex: 1; padding: 0.2rem 0.4rem; font-weight: 700; font-size: 0.95rem; }
 .head-tools { display: flex; gap: 0.1rem; opacity: 0; transition: opacity 0.12s; }
