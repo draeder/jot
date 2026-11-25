@@ -34,8 +34,8 @@
 
     <main v-if="page === 'app'" class="main">
       <WorkspaceList :open="showList" @picked="showList = false">
-        <p>Jot {{ build }}</p>
-        <p>Peer to peer on <a href="https://peerpigeon.io" target="_blank" rel="noopener">PeerPigeon</a>{{ relay ? ` · ${/relay/.test(relay) ? relay : `relay ${relay}`}` : '' }}</p>
+        <p class="build" :title="`Jot ${build}. Peer to peer on PeerPigeon.`">Jot {{ shortBuild }}</p>
+        <p v-if="relay" class="build" :title="relay">{{ /relay/.test(relay) ? relay : `relay ${relay}` }}</p>
         <p class="phone-only"><a href="#" @click.prevent="sheet = 'data'; showList = false">Export and import</a> · <a href="#" @click.prevent="sheet = 'help'; showList = false">How jot works</a></p>
         <p><a href="/privacy" @click.prevent="go('privacy')">Privacy</a> · <a href="/terms" @click.prevent="go('terms')">Terms</a></p>
       </WorkspaceList>
@@ -74,6 +74,8 @@ import { sendWaitingImages } from './lib/images'
 
 declare const __BUILD__: string
 const build = __BUILD__
+// The footer shows the commit and when it was built; the rest (the packages' commits) on hover.
+const shortBuild = build.replace(/\s*\([^)]*\)/, '')
 
 const { connected, starting, error: meshError, relay } = useMesh()
 const { account } = useIdentity()
@@ -171,6 +173,7 @@ const setTheme = (next: 'light' | 'dark') => {
 .center { margin: auto; }
 .scrim { display: none; }
 .phone-only { display: none; }
+.build { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: default; }
 .notice { position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%); z-index: 20; background: var(--ink); color: var(--paper); padding: 0.45rem 0.5rem 0.45rem 0.9rem; border-radius: var(--radius); display: flex; align-items: center; gap: 0.6rem; box-shadow: 0 8px 24px rgba(28, 33, 38, 0.25); }
 .notice .btn-quiet { color: var(--paper); }
 
