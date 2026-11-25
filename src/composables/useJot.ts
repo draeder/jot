@@ -19,9 +19,9 @@ import {
   parseCard, parseImport, parseIndex, parseLink, parseMeta, placeCard,
   type Card, type Link, type LinkKind, type Workspace,
 } from '@/lib/model'
-import { broadcast, onBroadcast, openRoom } from './useMesh'
+import { broadcast, onBroadcast, onRestart, onWake, openRoom } from './useMesh'
 import { open as openLive, seal, topicIn, topicOf } from '@/lib/live'
-import { useIdentity } from './useIdentity'
+import { refreshBrowserKeys, useIdentity } from './useIdentity'
 
 type Room = PeerPigeonStorage
 interface Change { origin: 'local' | 'remote'; op: 'upsert' | 'delete'; record: { key: string; value: unknown } | null; space: string; key: string }
@@ -84,6 +84,13 @@ async function dropLinks(ws: string, ids: string[]): Promise<void> {
   if (!ids.length) return
   if (ws === currentId.value) links.value = links.value.filter((l) => !ids.includes(l.id))
   await local.deleteLinks(ids)
+}
+
+/** A room's newer records, from its storage servers (PeerPigeon's own catch-up, run now). */
+async function pullRoom(room: Room | null): Promise<void> {
+  const r = room as unknown as { pullFromServers?: () => Promise<void>; serverCount?: () => number } | null
+  if (!r?.pullFromServers || !(r.serverCount?.() ?? 0)) return
+  await r.pullFromServers().catch(() => {})
 }
 
 /**
@@ -310,6 +317,16 @@ class Session {
     try { broadcast(await seal(room, { key, value, at: Number(value?.at) || Date.now() })) } catch { /* the servers have it */ }
   }
 
+  /**
+   * What the storage servers have that is newer than here, taken now (as changes from elsewhere). The
+   * servers pass changes on as they come, but not to a page that was asleep, or whose link to them was
+   * made again meanwhile: those it would never hear of.
+   */
+  async pull(): Promise<void> {
+    if (this.closed) return
+    await pullRoom(this.room)
+  }
+
   /** A change heard from another page with this room open. */
   async heard(key: string, value: Record<string, unknown> | null): Promise<void> {
     if (this.closed) return
@@ -459,6 +476,8 @@ class Index {
     if (w) await this.take(w)
   }
 
+  async pull(): Promise<void> { await pullRoom(this.room) }
+
   async put(w: Workspace): Promise<void> {
     if (!this.room) return
     try {
@@ -514,6 +533,26 @@ export async function startSync(): Promise<void> {
   for (const w of workspaces.value) startSession(w.id)
   await startIndex()
 }
+
+// The node made again (after a sleep it didn't come back from by itself): every room opened again on it.
+onRestart(() => {
+  if (!mesh) return
+  void refreshBrowserKeys().then(restartAll).then(startIndex)
+})
+// Back from a sleep, or back to this tab, and every half minute while it is in view: what the servers
+// have that this page did not hear of (a sleeping page hears nothing; its link to them may be new).
+let lastPull = 0
+export function catchUp(force = false): void {
+  if (!mesh || (!force && Date.now() - lastPull < 5000)) return
+  lastPull = Date.now()
+  for (const s of sessions.values()) void s.pull()
+  void index?.pull()
+}
+onWake(() => catchUp(true))
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') catchUp() })
+window.addEventListener('focus', () => catchUp())
+window.addEventListener('online', () => setTimeout(() => catchUp(true), 3000))
+setInterval(() => { if (document.visibilityState === 'visible') catchUp() }, 30_000)
 
 // Signing in or out: what this page writes is signed by someone else now, so every room again.
 watch(() => account.value?.keys.pub ?? null, (now, before) => {

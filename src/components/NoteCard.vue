@@ -116,15 +116,19 @@ const setColor = (c: string | undefined) => { picking.value = false; emit('chang
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null
 let written: string | null = null
-const saveNow = () => {
+/** Typed here and not yet saved: a change from elsewhere waits (what is typed here is newer). */
+let typed = false
+const saveNow = (): boolean => {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null }
+  typed = false
   // The note as last written (the editor may be gone by now: a card closing as it is deleted).
   const html = written ?? props.card.content
   const content = html === '<p></p>' ? '' : html
-  if (content === props.card.content) return
-  if (content.length > MAX_CONTENT) { error.value = 'This note is too long to keep: make it shorter, or split it into another card.'; return }
+  if (content === props.card.content) return false
+  if (content.length > MAX_CONTENT) { error.value = 'This note is too long to keep: make it shorter, or split it into another card.'; return false }
   error.value = ''
   emit('change', { content })
+  return true
 }
 // Written as it is typed (a moment after each pause), so the people it is shared with see it.
 const saveSoon = () => { if (saveTimer) clearTimeout(saveTimer); saveTimer = setTimeout(saveNow, 350) }
@@ -163,15 +167,25 @@ const editor = useEditor({
     handlePaste: (_view, event) => insertFiles([...(event.clipboardData?.files ?? [])]),
     handleDrop: (_view, event) => insertFiles([...((event as DragEvent).dataTransfer?.files ?? [])]),
   },
-  onUpdate: ({ editor: e }) => { written = e.getHTML(); if (editing.value) saveSoon(); else saveNow() },
+  onUpdate: ({ editor: e }) => { written = e.getHTML(); if (editing.value) { typed = true; saveSoon() } else saveNow() },
 })
 
-// A change made elsewhere (another device, someone it is shared with): shown, unless it is being written here.
-watch(() => props.card.content, (content) => {
+// A change made elsewhere (another device, someone it is shared with): shown at once, also in a note open
+// here, unless something typed here is waiting to be saved (then it is newer, and stands).
+function showArrived(content: string): void {
   const e = editor.value
-  if (!e || editing.value) return
-  if (e.getHTML() !== content && !(content === '' && e.isEmpty)) { e.commands.setContent(content, { emitUpdate: false }); written = null }
-})
+  if (!e || e.isDestroyed || typed) return
+  if (e.getHTML() === content || (content === '' && e.isEmpty)) return
+  const { from, to } = e.state.selection
+  e.commands.setContent(content, { emitUpdate: false })
+  written = null
+  if (editing.value) {
+    // The caret where it was, as near as the new note allows.
+    const end = e.state.doc.content.size
+    e.commands.setTextSelection({ from: Math.min(from, end), to: Math.min(to, end) })
+  }
+}
+watch(() => props.card.content, showArrived)
 watch(() => props.card.title, (t) => { if (!naming.value) title.value = t })
 
 const onBodyPress = (e: PointerEvent) => {
@@ -210,11 +224,12 @@ function startEditing(press?: PointerEvent): void {
 /** Done writing (a click elsewhere, Escape): what was written is kept. */
 function stopEditing(): void {
   if (!editing.value) return
-  saveNow()
+  const saved = saveNow()
   editing.value = false
   editor.value?.setEditable(false, false)
   emit('editing', false)
-  // What arrived from elsewhere while writing here is not shown: what was written here is newer, and stands.
+  // What arrived from elsewhere while this was open, if nothing typed here replaced it.
+  if (!saved) showArrived(props.card.content)
 }
 watch(() => props.selected, (on) => { if (!on) { stopEditing(); picking.value = false } })
 watch(() => props.canEdit, (can) => { if (!can) stopEditing() })

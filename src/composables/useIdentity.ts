@@ -118,6 +118,11 @@ export async function initIdentity(): Promise<void> {
   ready.value = true
 }
 
+/** This browser's keys again (the node made again after it could not start). */
+export async function refreshBrowserKeys(): Promise<void> {
+  browser.value = (await browserKeys()) ?? browser.value
+}
+
 export async function createAccount(alias: string, password: string): Promise<void> {
   if (!validAlias(alias)) throw coded("That name can't be used", 'bad-name')
   if (await findRecord(alias, 1000)) throw coded('That name is already taken', 'name-taken')

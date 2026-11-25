@@ -93,7 +93,7 @@ const showList = ref(false)
 const canvas = ref<InstanceType<typeof Canvas> | null>(null)
 
 const statusClass = computed(() => (connected.value ? 'status-connected' : starting.value ? 'status-connecting' : 'status-off'))
-const statusText = computed(() => (connected.value ? 'Connected' : starting.value ? 'Connecting' : meshError.value ? 'Offline' : 'Starting'))
+const statusText = computed(() => (connected.value ? 'Connected' : starting.value ? 'Connecting' : meshError.value ? 'Offline' : 'Reconnecting'))
 
 async function openCard(ws: string, card: string): Promise<void> {
   await select(ws)
@@ -117,14 +117,11 @@ window.addEventListener('hashchange', () => { void takeInvite() })
 onMounted(async () => {
   await loadJot()
   await takeInvite()
-  try {
-    await startMesh()
-    await initIdentity()
-    await startSync()
-    if (await hasServers()) void sendWaitingImages()
-  } catch (error) {
-    console.warn('jot: not connected:', error)
-  }
+  // Not connected at first (offline): jot works from this browser, and the mesh is tried again (useMesh).
+  try { await startMesh() } catch (error) { console.warn('jot: not connected yet:', error) }
+  await initIdentity()
+  await startSync()
+  if (await hasServers()) void sendWaitingImages()
 })
 
 // The theme switch (the page starts in the kept theme, or the system's: index.html).
