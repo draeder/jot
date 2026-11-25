@@ -13,7 +13,7 @@
           @keydown.enter.prevent="saveTitle" @keydown.esc.prevent="naming = false" @blur="saveTitle" @pointerdown.stop
         />
       </span>
-      <h3 v-else class="title" :class="{ renamable: canEdit }" :title="canEdit ? 'Click to rename' : undefined" @pointerdown="titlePress = [$event.clientX, $event.clientY]" @click="onTitleClick" @dblclick.stop>{{ card.title || 'Untitled' }}</h3>
+      <h3 v-else class="title" :class="{ renamable: canEdit }" :title="canEdit ? 'Click to rename' : undefined" @pointerdown="titlePress = [$event.clientX, $event.clientY]" @pointerup="onTitleClick" @dblclick.stop>{{ card.title || 'Untitled' }}</h3>
       <div v-if="canEdit" class="head-tools" @pointerdown.stop>
         <button class="tool" title="Card colour" aria-label="Card colour" :aria-expanded="picking" @click="picking = !picking"><Icon name="palette" /></button>
         <button class="tool" title="Delete card" aria-label="Delete card" @click="$emit('delete')"><Icon name="trash" /></button>
@@ -88,9 +88,10 @@ const uploading = ref(false)
 const startMove = (e: PointerEvent) => { if (!naming.value) emit('move', e) }
 const startResize = (e: PointerEvent) => emit('resize', e)
 
-// A click on the title renames the card; a drag on it (the title bar) moves the card instead.
+// A click on the title renames the card; a drag on it (the title bar) moves the card instead. Taken from
+// the press and release, not the click: Safari sends no click after a press the canvas has taken (to drag).
 const titlePress = ref<[number, number] | null>(null)
-const onTitleClick = (e: MouseEvent) => {
+const onTitleClick = (e: PointerEvent) => {
   const p = titlePress.value
   titlePress.value = null
   if (p && Math.hypot(e.clientX - p[0], e.clientY - p[1]) < 4 && !props.linking) void startNaming()
