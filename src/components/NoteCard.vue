@@ -7,7 +7,7 @@
   >
     <header class="card-head" @pointerdown="startMove">
       <input
-        v-if="naming" ref="titleInput" v-model="title" class="title-input" :maxlength="MAX_TITLE" aria-label="Card title"
+        v-if="naming" ref="titleInput" v-model="title" class="title-input" :size="Math.max(4, title.length + 1)" :maxlength="MAX_TITLE" aria-label="Card title"
         @keydown.enter.prevent="saveTitle" @keydown.esc.prevent="naming = false" @blur="saveTitle" @pointerdown.stop
       />
       <h3 v-else class="title" :class="{ renamable: canEdit }" :title="canEdit ? 'Click to rename' : undefined" @pointerdown="titlePress = [$event.clientX, $event.clientY]" @click="onTitleClick" @dblclick.stop>{{ card.title || 'Untitled' }}</h3>
@@ -266,9 +266,9 @@ const buttons = computed(() => {
 .card-head { position: relative; display: flex; align-items: center; gap: 0.4rem; padding: 0.45rem 0.5rem 0.45rem 0.85rem; border-bottom: 1px solid rgba(127, 127, 127, 0.22); cursor: grab; touch-action: none; }
 .note-card.linking .card-head { cursor: crosshair; }
 .title.renamable { cursor: text; }
-.title { flex: 1; min-width: 0; font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.title-input { flex: 1; padding: 0.2rem 0.4rem; font-weight: 700; font-size: 0.95rem; }
-.head-tools { display: flex; gap: 0.1rem; opacity: 0; transition: opacity 0.12s; }
+.title { flex: 0 1 auto; min-width: 0; font-size: 0.95rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.title-input { flex: 0 1 auto; width: auto; min-width: 0; max-width: 100%; padding: 0.2rem 0.4rem; font-weight: 700; font-size: 0.95rem; }
+.head-tools { margin-left: auto; display: flex; gap: 0.1rem; opacity: 0; transition: opacity 0.12s; }
 .note-card:hover .head-tools, .note-card.selected .head-tools, .head-tools:focus-within { opacity: 1; }
 .tool { display: grid; place-items: center; width: 28px; height: 28px; border-radius: var(--radius); color: inherit; opacity: 0.75; }
 .tool:hover { opacity: 1; background: rgba(127, 127, 127, 0.16); }
