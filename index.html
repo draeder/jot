@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Jot" />
+    <meta name="theme-color" content="#e8f6f9" />
+    <script>
+      // The theme before the first paint (the switch in the top bar changes it).
+      (function () {
+        var theme = null;
+        try { theme = localStorage.getItem('jot:theme'); } catch (e) {}
+        if (theme !== 'light' && theme !== 'dark') {
+          theme = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+        if (theme === 'dark') document.querySelector('meta[name="theme-color"]').setAttribute('content', '#1b2430');
+      })();
+    </script>
+    <title>Jot</title>
+    <meta name="description" content="Visual notes on an infinite canvas: cards, rich text and the lines between them. On all your devices and shared live, peer to peer, sealed so only you and those you share with can read them." />
+    <link rel="canonical" href="https://jot.ooo/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Jot" />
+    <meta property="og:title" content="Jot" />
+    <meta property="og:description" content="Visual notes on an infinite canvas, on all your devices and shared live, peer to peer." />
+    <meta property="og:url" content="https://jot.ooo" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="Jot" />
+    <meta name="twitter:description" content="Visual notes on an infinite canvas, on all your devices and shared live, peer to peer." />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

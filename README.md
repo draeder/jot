@@ -1,138 +1,33 @@
-# Jot - Visual Note Taking App
+# Jot
 
-A modern note-taking application with visual workspace capabilities, rich text editing, and multi-provider authentication.
+Visual notes on an infinite canvas: cards with rich text, pictures and colours, and the lines between them. On all your devices and shared live, peer to peer, on [PeerPigeon](https://peerpigeon.io). At [jot.ooo](https://jot.ooo).
 
-## Features
+- **No account needed.** Your workspaces are kept in your browser and work offline.
+- **Kept, sealed.** Each workspace has a room of its own on the PeerPigeon mesh's storage servers, named and sealed with a secret only you (and those you share it with) have. The servers keep only what they can't read.
+- **On every device.** Log in with a PigeonIdP account (the same as PigeonChess, PigeonFeed and the PeerPigeon console), and your list of workspaces, with their secrets, is kept in a room only your account can write and read.
+- **Shared live.** A workspace's edit link lets someone change it with you; you see each other's changes as they are made. Its owner can make a new link, which stops the old one working.
+- **Published read-only.** A read-only link opens a copy only its publisher's key writes, kept up to date while they have jot open.
+- **Your data.** Export everything to one file, and import it (or an export of the first jot) again. The first jot's notes in a browser come over by themselves the first time the new one opens there.
 
-- **Multi-Provider Authentication**: Sign in with Google, Microsoft, Apple, or GitHub
-- **Visual Workspaces**: Create and manage multiple named workspaces
-- **Rich Text Cards**: Create note cards with rich text editing capabilities
-- **Drag & Drop**: Drag and drop cards in a flexible grid layout
-- **Connections**: Create arrow and line connectors between cards
-- **Export/Import**: Complete data backup and restoration via JSON files
-- **IndexedDB Storage**: Client-side data storage using IndexedDB
-- **Responsive Design**: Modern, responsive UI with Tailwind CSS
+## How it works
 
-## Tech Stack
+| | |
+|---|---|
+| `src/lib/model.ts` | workspaces, cards and lines as records, checked; search, placement, export and import |
+| `src/lib/links.ts` | room names and links (the secret goes after the `#`, which browsers never send to a server) |
+| `src/lib/local.ts` | what this browser keeps (IndexedDB), and reading the first jot's database |
+| `src/composables/useJot.ts` | the notes as the page shows them, and keeping them in step with their rooms: the newest change to each card or line wins |
+| `src/composables/useMesh.ts`, `useIdentity.ts` | the PeerPigeon node (network `jot`, room `global`) and PigeonIdP accounts, as PigeonFeed has them |
+| `src/lib/media.ts`, `images.ts`, `jot-image.ts` | pictures, in pieces on the storage servers, each sealed with a key made from its hash |
+| `src/components/` | the canvas, cards (TipTap), the workspace list and the sheets |
 
-- **Framework**: Next.js 15 with App Router
-- **Authentication**: NextAuth.js with multiple providers
-- **Database**: IndexedDB with Dexie.js
-- **Rich Text**: Tiptap editor
-- **Drag & Drop**: DND Kit
-- **Styling**: Tailwind CSS
-- **Icons**: Lucide React
+## Running it
 
-## Setup Instructions
-
-### 1. Install Dependencies
-
-```bash
+```sh
 npm install
+npm run dev        # https://localhost:5173
+npm test
+npm run deploy     # builds, then the Worker on jot.ooo (wrangler.jsonc)
 ```
 
-### 2. Environment Variables
-
-Copy the `.env.local` file and fill in your OAuth credentials:
-
-```bash
-cp .env.local .env.local.example
-```
-
-Configure the following OAuth providers in your `.env.local`:
-
-#### Google OAuth
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select existing
-3. Enable Google+ API
-4. Create OAuth 2.0 credentials
-5. Add `http://0.0.0.0:3000/api/auth/callback/google` to authorized redirect URIs
-
-#### GitHub OAuth
-1. Go to GitHub Settings → Developer settings → OAuth Apps
-2. Create a new OAuth App
-3. Authorization callback URL: `http://0.0.0.0:3000/api/auth/callback/github`
-
-#### Microsoft OAuth
-1. Go to [Azure App Registrations](https://portal.azure.com/#blade/Microsoft_AAD_RegisteredApps)
-2. Create a new registration
-3. Add redirect URI: `http://0.0.0.0:3000/api/auth/callback/microsoft`
-
-#### Apple OAuth
-1. Go to [Apple Developer Console](https://developer.apple.com/)
-2. Create a new App ID and Service ID
-3. Configure Sign in with Apple
-4. Add redirect URI: `http://0.0.0.0:3000/api/auth/callback/apple`
-
-### 3. Run Development Server
-
-```bash
-npm run dev
-```
-
-Open [http://0.0.0.0:3000](http://0.0.0.0:3000) in your browser.
-
-## Usage
-
-1. **Sign In**: Choose your preferred authentication provider
-2. **Create Workspace**: Click "New Workspace" in the sidebar
-3. **Add Cards**: Use the "Add Card" button to create note cards
-4. **Edit Cards**: Click the edit button on any card to modify content
-5. **Drag Cards**: Use the grip handle to drag cards around
-6. **Connect Cards**: Click "Connect" mode and click two cards to create connections
-7. **Resize Cards**: Drag the resize handle in the bottom-right corner
-
-## Project Structure
-
-```
-src/
-├── app/
-│   ├── api/auth/[...nextauth]/     # NextAuth API routes
-│   ├── auth/signin/                # Sign-in page
-│   ├── globals.css                 # Global styles
-│   ├── layout.tsx                  # Root layout
-│   └── page.tsx                    # Home page
-├── components/
-│   ├── card.tsx                    # Note card component
-│   ├── dashboard.tsx               # Main dashboard
-│   ├── providers.tsx               # Session provider wrapper
-│   ├── rich-text-editor.tsx       # Rich text editor
-│   ├── workspace-canvas.tsx       # Canvas with drag-drop
-│   └── workspace-selector.tsx     # Workspace management
-├── lib/
-│   ├── auth.ts                     # NextAuth configuration
-│   └── db.ts                       # IndexedDB/Dexie setup
-└── types/
-    └── next-auth.d.ts              # NextAuth type extensions
-```
-
-## Development
-
-### Adding New Features
-
-1. **Database Schema Changes**: Modify `src/lib/db.ts`
-2. **New Components**: Add to `src/components/`
-3. **Authentication**: Extend `src/lib/auth.ts`
-4. **Styling**: Use Tailwind classes or modify `src/app/globals.css`
-
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
-
-## Deployment
-
-This app can be deployed to any platform that supports Next.js:
-
-- **Vercel**: Built-in Next.js support
-- **Netlify**: Use Next.js plugin
-- **Railway**: Node.js deployment
-- **Self-hosted**: Use Docker or PM2
-
-Remember to update the `NEXTAUTH_URL` environment variable for production deployment.
-
-## License
-
-MIT License - see LICENSE file for details.
+`?signal=ws://<host>:8788/ws` in the address uses a local freertc relay instead of the public ones.

@@ -1,0 +1,409 @@
+/*
+  Jot in Pickled Bluewood and Cruise (as PigeonFeed, PigeonChess, PigeonAI, PigeonFS and FreeRTC).
+  Feather greys for the room, and the green sheen of a pigeon's neck used only for what is live:
+  being connected, something new, the one button that does it.
+*/
+:root {
+  --paper: #e8f6f9;      /* the room: Cruise, lightened */
+  --surface: #f5fbfc;    /* raised: sheets, inputs */
+  --ink: #2a3747;        /* Pickled Bluewood */
+  --ink-2: #46586e;      /* secondary text */
+  --line: #bee6ee;       /* Cruise */
+  --line-strong: #8aa7b3;
+  --wing: #bee6ee;       /* hover, chips: Cruise */
+  --slate: #5a7187;      /* quiet marks */
+  --sheen: #237a50;      /* live: connected, new, send */
+  --sheen-deep: #1b6140;
+  --sheen-wash: #d4f0e0;
+  --mark: #d9a93a;       /* unread */
+  --stop: #b4493d;       /* delete, errors */
+  --stop-wash: #f6dcd8;
+  --on-sheen: #ffffff;     /* text on a live (green) fill */
+
+  --font: 'Archivo Variable', 'Archivo', system-ui, sans-serif;
+  --topbar: 56px;
+  --radius: 6px;
+
+
+  /* Names older component styles still use */
+  --primary-color: var(--sheen);
+  --primary-hover: var(--sheen-deep);
+  --primary-light: var(--sheen);
+  --secondary-color: var(--ink-2);
+  --success-color: var(--sheen);
+  --danger-color: var(--stop);
+  --warning-color: #9a6a1f;
+  --info-color: var(--slate);
+  --light-color: var(--paper);
+  --dark-color: var(--ink);
+  --white: #ffffff;
+  --black: #000000;
+}
+
+/* Night slate (the theme switch in the top bar): the same feathers after
+   dark, as on pigeon.peer.ooo. */
+html[data-theme='dark'] {
+  --paper: #1b2430;      /* Pickled Bluewood, deepened */
+  --surface: #151d27;
+  --ink: #e8f6f9;
+  --ink-2: #9dbfc8;
+  --line: #2c394a;
+  --line-strong: #3d4c5f;
+  --wing: #151d27;
+  --slate: #8aa7b3;
+  --sheen: #7fd8a6;      /* live */
+  --sheen-deep: #9ae3b9;
+  --sheen-wash: #1d3a30;
+  --mark: #f2c879;
+  --stop: #f29b91;
+  --stop-wash: #3d2a2e;
+  --on-sheen: #1e2a37;
+  --warning-color: #f2c879;
+  --info-color: #9cc3f5;
+  color-scheme: dark;
+}
+
+/* The logo is a black bird: on night slate it is drawn white. */
+html[data-theme='dark'] .brand-mark {
+  filter: invert(1);
+}
+
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font);
+  font-size: 15px;
+  line-height: 1.45;
+  background: var(--paper);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#app {
+  min-height: 100dvh;
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  background: none;
+  border: 0;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sheen);
+  outline-offset: 2px;
+}
+
+input,
+select,
+textarea {
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.65rem;
+  width: 100%;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--sheen);
+  box-shadow: 0 0 0 2px var(--sheen-wash);
+}
+
+input[type='checkbox'],
+input[type='radio'] {
+  width: auto;
+  accent-color: var(--sheen);
+}
+
+input[type='color'] {
+  padding: 2px;
+  height: 2.25rem;
+}
+
+code {
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  background: none;
+}
+
+/* Buttons used by sheets */
+button.primary,
+button.secondary,
+button.success,
+button.danger {
+  border-radius: var(--radius);
+  padding: 0.5rem 0.9rem;
+  font-weight: 600;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+}
+
+button.primary,
+button.success {
+  background: var(--sheen);
+  border-color: var(--sheen);
+  color: #fff;
+}
+
+button.primary:hover:not(:disabled),
+button.success:hover:not(:disabled) {
+  background: var(--sheen-deep);
+}
+
+button.secondary:hover:not(:disabled) {
+  border-color: var(--ink-2);
+}
+
+button.danger {
+  color: var(--stop);
+  border-color: var(--stop);
+}
+
+button.danger:hover:not(:disabled) {
+  background: var(--stop-wash);
+}
+
+button.primary:disabled,
+button.secondary:disabled,
+button.success:disabled,
+button.danger:disabled {
+  opacity: 0.45;
+}
+
+/* Sheets */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 33, 38, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  z-index: 1000;
+}
+
+.modal {
+  background: var(--surface);
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 1.5rem;
+  width: min(100%, 560px);
+  max-height: calc(100dvh - 32px);
+  overflow: auto;
+  box-shadow: 0 18px 50px rgba(28, 33, 38, 0.25);
+}
+
+.modal h2,
+.modal h3 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.75rem;
+}
+
+.modal p {
+  color: var(--ink-2);
+  margin-bottom: 1rem;
+}
+
+.modal .modal-buttons {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 1.25rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ---------- shared pieces (as PigeonChess draws them) ---------- */
+a {
+  color: var(--sheen);
+}
+
+.btn {
+  padding: 0.5rem 0.85rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  font-weight: 600;
+  font-size: 0.9rem;
+}
+
+.btn:hover:not(:disabled) {
+  border-color: var(--ink-2);
+}
+
+.btn:disabled {
+  opacity: 0.45;
+}
+
+.btn.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
+.btn-go {
+  background: var(--sheen);
+  border-color: var(--sheen);
+  color: var(--on-sheen);
+}
+
+.btn-go:hover:not(:disabled) {
+  background: var(--sheen-deep);
+  border-color: var(--sheen-deep);
+}
+
+.btn-stop {
+  color: var(--stop);
+  border-color: transparent;
+  background: transparent;
+}
+
+.btn-stop:hover:not(:disabled) {
+  border-color: var(--stop);
+  background: var(--stop-wash);
+}
+
+.btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--ink-2);
+  font-weight: 500;
+}
+
+.btn-quiet:hover:not(:disabled) {
+  background: var(--wing);
+  border-color: transparent;
+  color: var(--ink);
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  margin: 0.6rem 0;
+}
+
+.field > span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.alert {
+  font-size: 0.85rem;
+  color: var(--stop);
+}
+
+.hint {
+  font-size: 0.85rem;
+  color: var(--ink-2);
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 14px 16px;
+}
+
+.section-title {
+  font-stretch: 112%;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: -0.01em;
+  margin: 1.25rem 0 0.5rem;
+}
+
+.badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.35rem;
+  margin-left: 0.35rem;
+  border-radius: 999px;
+  background: var(--sheen);
+  color: var(--on-sheen);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* The account and sheet buttons in a row */
+.row { display: flex; gap: 0.5rem; align-items: center; flex-wrap: wrap; }
+
+.copy-field { display: flex; gap: 0.5rem; }
+.copy-field input { font-size: 0.8rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+
+kbd {
+  font: 600 0.75rem/1 ui-monospace, SFMono-Regular, Menlo, monospace;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--line-strong);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--surface);
+}
+
+/* ---------- a note's words (the editor's, and its read-only view) ---------- */
+.note { font-size: 0.9rem; line-height: 1.5; word-wrap: break-word; }
+.note > * + * { margin-top: 0.5em; }
+.note h1 { font-size: 1.35em; font-weight: 800; }
+.note h2 { font-size: 1.15em; font-weight: 750; }
+.note h3 { font-size: 1.02em; font-weight: 700; }
+.note ul, .note ol { padding-left: 1.4em; }
+.note li > p { margin: 0; }
+.note blockquote { border-left: 3px solid currentColor; opacity: 0.85; padding-left: 0.8em; }
+.note code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-weight: 500; font-size: 0.85em; padding: 0.1em 0.3em; border-radius: 4px; background: rgba(127, 127, 127, 0.16); }
+.note pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.82em; padding: 0.7em 0.85em; border-radius: var(--radius); background: #1e2a37; color: #e8f6f9; overflow-x: auto; }
+.note pre code { background: none; padding: 0; font-size: inherit; color: inherit; }
+.note a { color: inherit; text-decoration: underline; }
+.note hr { border: 0; border-top: 1px solid currentColor; opacity: 0.3; }
+.note img { max-width: 100%; height: auto; border-radius: 4px; display: block; }
+.note ul[data-type='taskList'] { list-style: none; padding-left: 0.2em; }
+.note ul[data-type='taskList'] li { display: flex; gap: 0.5em; align-items: flex-start; }
+.note ul[data-type='taskList'] li > label { margin-top: 0.15em; flex: none; }
+.note ul[data-type='taskList'] li > div { flex: 1; min-width: 0; }
+.note ul[data-type='taskList'] li[data-checked='true'] > div { text-decoration: line-through; opacity: 0.65; }
+.note p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; height: 0; pointer-events: none; opacity: 0.5; }
+.note .ProseMirror { outline: none; min-height: 100%; }
+.note .ProseMirror > * + * { margin-top: 0.5em; }
+
+/* Code colours (highlight.js classes, from lowlight), on the dark code block */
+.hljs-comment, .hljs-quote { color: #8aa7b3; font-style: italic; }
+.hljs-keyword, .hljs-selector-tag, .hljs-built_in, .hljs-type { color: #9cc3f5; }
+.hljs-string, .hljs-attr, .hljs-symbol, .hljs-bullet, .hljs-addition { color: #7fd8a6; }
+.hljs-number, .hljs-literal, .hljs-variable, .hljs-template-variable { color: #f2c879; }
+.hljs-title, .hljs-section, .hljs-name, .hljs-selector-id, .hljs-selector-class { color: #f29b91; }
+.hljs-deletion { color: #f29b91; }

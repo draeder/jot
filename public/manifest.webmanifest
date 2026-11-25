@@ -1,0 +1,12 @@
+{
+  "name": "Jot",
+  "short_name": "Jot",
+  "description": "Visual notes on an infinite canvas, on all your devices and shared live, peer to peer.",
+  "start_url": "/?source=home",
+  "display": "standalone",
+  "background_color": "#e8f6f9",
+  "theme_color": "#e8f6f9",
+  "icons": [
+    { "src": "/favicon.ico", "sizes": "32x32", "type": "image/x-icon" }
+  ]
+}
