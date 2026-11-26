@@ -50,6 +50,7 @@ import { Placeholder } from '@tiptap/extensions'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
 import { AllSelection, Selection, TextSelection } from '@tiptap/pm/state'
+import type { EditorView } from '@tiptap/pm/view'
 import Icon from './Icon.vue'
 import { JotImage } from '@/lib/jot-image'
 import { addImage } from '@/lib/images'
@@ -149,6 +150,21 @@ const insertFiles = (files: File[]): boolean => {
   return true
 }
 
+/** A box ticked in a closed note: the tick put in the note (its item found from the box's own place). */
+function tickClosed(view: EditorView, box: HTMLInputElement): void {
+  if (!props.canEdit || view.editable) return
+  const item = box.closest('li')
+  const content = item?.querySelector(':scope > div')
+  if (!item || !content) return
+  const $at = view.state.doc.resolve(view.posAtDOM(content, 0))
+  for (let d = $at.depth; d > 0; d--) {
+    const node = $at.node(d)
+    if (node.type.name !== 'taskItem') continue
+    if (node.attrs.checked !== box.checked) view.dispatch(view.state.tr.setNodeMarkup($at.before(d), undefined, { ...node.attrs, checked: box.checked }))
+    return
+  }
+}
+
 /** Where the caret was before ⌘A selected all of the note (a second ⌘A puts it back). */
 let caretBeforeAll: { anchor: number; head: number } | null = null
 
@@ -160,6 +176,8 @@ const editor = useEditor({
     CodeBlockLowlight.configure({ lowlight }),
     TaskList,
     // A box can be ticked without opening the note (and in a workspace that can't be edited, not at all).
+    // TipTap only flips the box on screen then: the tick is put in the note (handleDOMEvents.change), so
+    // it is kept, synced, and crossed out like any other.
     TaskItem.configure({ nested: true, onReadOnlyChecked: () => props.canEdit }),
     // Shown on an empty note whether or not it is open: added only on opening, it redraws the line the
     // caret has just gone to, and the caret is lost.
@@ -182,6 +200,13 @@ const editor = useEditor({
         view.dispatch(state.tr.setSelection(new AllSelection(state.doc)))
       }
       return true
+    },
+    handleDOMEvents: {
+      change: (view, event) => {
+        const box = event.target as HTMLElement
+        if (box instanceof HTMLInputElement && box.type === 'checkbox') tickClosed(view, box)
+        return false
+      },
     },
     handlePaste: (_view, event) => insertFiles([...(event.clipboardData?.files ?? [])]),
     handleDrop: (_view, event) => insertFiles([...((event as DragEvent).dataTransfer?.files ?? [])]),
