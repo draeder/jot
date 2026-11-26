@@ -16,6 +16,10 @@
 
       <SearchBox v-if="page === 'app'" class="topsearch" @pick="openCard" />
 
+      <nav v-if="page === 'welcome'" class="nav" aria-label="Jot">
+        <button class="nav-link nav-login" @click="login">Log in</button>
+        <button class="btn btn-go nav-start" @click="start">Start writing</button>
+      </nav>
       <nav v-if="page === 'app'" class="nav" aria-label="Jot">
         <button class="nav-link" :disabled="!current" @click="sheet = 'share'"><Icon name="share" /><span>Share</span></button>
         <button class="nav-link" title="Export and import" aria-label="Export and import" @click="sheet = 'data'"><Icon name="data" /><span class="wide-only">Export</span></button>
@@ -32,11 +36,15 @@
       </button>
     </header>
 
-    <main v-if="page === 'app'" class="main">
+    <main v-if="deciding" class="main" />
+    <main v-else-if="page === 'welcome'" class="main legal-main">
+      <LandingPage @start="start" @login="login" @go="go" />
+    </main>
+    <main v-else-if="page === 'app'" class="main">
       <WorkspaceList :open="showList" @picked="showList = false">
         <p class="build" :title="buildTitle">Jot {{ shortBuild }}</p>
         <p class="phone-only"><a href="#" @click.prevent="sheet = 'data'; showList = false">Export and import</a> · <a href="#" @click.prevent="sheet = 'help'; showList = false">How jot works</a></p>
-        <p><a href="/privacy" @click.prevent="go('privacy')">Privacy</a> · <a href="/terms" @click.prevent="go('terms')">Terms</a></p>
+        <p><a href="/welcome" @click.prevent="go('welcome')">About jot</a> · <a href="/privacy" @click.prevent="go('privacy')">Privacy</a> · <a href="/terms" @click.prevent="go('terms')">Terms</a></p>
       </WorkspaceList>
       <div v-if="showList" class="scrim" @click="showList = false" />
       <Canvas v-if="current" ref="canvas" :key="current.id" />
@@ -55,12 +63,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import AccountSheet from './components/AccountSheet.vue'
 import Canvas from './components/Canvas.vue'
 import DataSheet from './components/DataSheet.vue'
 import HelpSheet from './components/HelpSheet.vue'
 import Icon from './components/Icon.vue'
+import LandingPage from './components/LandingPage.vue'
 import LegalPage from './components/LegalPage.vue'
 import SearchBox from './components/SearchBox.vue'
 import ShareSheet from './components/ShareSheet.vue'
@@ -70,6 +79,7 @@ import { initIdentity, useIdentity } from './composables/useIdentity'
 import { loadJot, openInvite, select, startSync, useJot } from './composables/useJot'
 import { parseInvite } from './lib/links'
 import { sendWaitingImages } from './lib/images'
+import { local } from './lib/local'
 
 declare const __BUILD__: string
 const build = __BUILD__
@@ -79,13 +89,24 @@ const buildTitle = computed(() => `Jot ${build}\nPeer to peer on PeerPigeon${rel
 
 const { connected, starting, error: meshError, relay } = useMesh()
 const { account } = useIdentity()
-const { current, loaded, notice } = useJot()
+const { current, loaded, notice, workspaces, cards } = useJot()
+// Logged in (on this device before): not new.
+watch(account, (a) => { if (a) { markStarted(); if (page.value === 'welcome' && location.pathname === '/') page.value = 'app' } })
 
-type Page = 'app' | 'privacy' | 'terms'
-const pageOf = (path: string): Page => (path === '/privacy' ? 'privacy' : path === '/terms' ? 'terms' : 'app')
+type Page = 'app' | 'welcome' | 'privacy' | 'terms'
+const pageOf = (path: string): Page => (path === '/privacy' ? 'privacy' : path === '/terms' ? 'terms' : path === '/welcome' ? 'welcome' : 'app')
 const page = ref<Page>(pageOf(location.pathname))
 const go = (p: Page) => { history.pushState(null, '', p === 'app' ? '/' : `/${p}`); page.value = p; window.scrollTo(0, 0) }
 const goApp = () => go('app')
+
+// Someone new (no notes in this browser, no link to a workspace, not logged in) first sees what jot is, at
+// "/"; after they start, or for anyone with notes, "/" is jot itself. The page about it stays at /welcome.
+const STARTED = 'jot:started'
+const started = (() => { try { return localStorage.getItem(STARTED) === '1' } catch { return true } })()
+const markStarted = () => { try { localStorage.setItem(STARTED, '1') } catch { /* not kept */ } }
+const deciding = ref(!started && page.value === 'app' && !/^#\/(join|view)\//.test(location.hash))
+const start = () => { markStarted(); go('app') }
+const login = () => { markStarted(); go('app'); sheet.value = 'account' }
 window.addEventListener('popstate', () => { page.value = pageOf(location.pathname) })
 
 const sheet = ref<'share' | 'account' | 'data' | 'help' | null>(null)
@@ -115,7 +136,15 @@ async function takeInvite(): Promise<void> {
 window.addEventListener('hashchange', () => { void takeInvite() })
 
 onMounted(async () => {
+  const hadNotes = deciding.value ? (await local.workspaces()).length > 0 : true
   await loadJot()
+  if (deciding.value) {
+    // Notes from the first jot came over (or were here): not new.
+    const fresh = !hadNotes && workspaces.value.length <= 1 && !cards.value.length
+    if (fresh) page.value = 'welcome'
+    else markStarted()
+    deciding.value = false
+  }
   await takeInvite()
   // Not connected at first (offline): jot works from this browser, and the mesh is tried again (useMesh).
   try { await startMesh() } catch (error) { console.warn('jot: not connected yet:', error) }
@@ -156,6 +185,7 @@ const setTheme = (next: 'light' | 'dark') => {
 .nav-link { display: inline-flex; align-items: center; gap: 0.4rem; padding: 0.4rem 0.65rem; border-radius: var(--radius); font-weight: 500; color: var(--ink); }
 .nav-link:hover:not(:disabled) { background: var(--wing); }
 .nav-link:disabled { opacity: 0.4; }
+.nav-start { margin-left: 0.5rem; }
 .nav-login { border: 1px solid var(--line-strong); margin-left: 0.4rem; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; }
 .theme-switch { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border-radius: var(--radius); color: var(--ink-2); }
 .theme-switch:hover { color: var(--ink); }
