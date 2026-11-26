@@ -14,11 +14,11 @@
       <!-- A workspace, drawn: what jot looks like. -->
       <div class="demo" aria-hidden="true">
         <svg class="demo-lines">
-          <defs><marker id="lp-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" /></marker></defs>
-          <line x1="42%" y1="23%" x2="57.6%" y2="23%" marker-end="url(#lp-arrow)" />
-          <line x1="26%" y1="42.5%" x2="35%" y2="57.6%" marker-end="url(#lp-arrow)" />
+          <defs><marker id="lp-arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" /></marker></defs>
+          <line x1="42%" y1="22%" x2="58%" y2="22%" marker-end="url(#lp-arrow)" />
+          <line x1="26%" y1="38%" x2="35.2%" y2="58%" marker-end="url(#lp-arrow)" />
         </svg>
-        <div class="card" style="left: 4%; top: 6%; width: 38%">
+        <div class="card" style="left: 4%; top: 6%; width: 38%; height: 32%">
           <header>Launch plan</header>
           <ul class="tasks">
             <li class="done"><i />Sketch the cards</li>
@@ -26,12 +26,12 @@
             <li><i />Ship it</li>
           </ul>
         </div>
-        <div class="card" style="left: 58%; top: 4%; width: 38%; background: #fff4b8">
+        <div class="card colored" style="left: 58%; top: 4%; width: 38%; height: 32%; background: #fff4b8">
           <header>Questions</header>
           <p>Which colour for the icon?</p>
           <p class="muted">Ask Sam on Friday</p>
         </div>
-        <div class="card" style="left: 30%; top: 58%; width: 44%; background: #c8f0e1">
+        <div class="card colored" style="left: 30%; top: 58%; width: 44%; height: 30%; background: #c8f0e1">
           <header>Notes from Tuesday</header>
           <p><b>Decided:</b> one canvas per project, lines for what depends on what.</p>
         </div>
@@ -103,14 +103,18 @@ h1 { font-size: clamp(2.4rem, 5vw, 3.6rem); font-weight: 800; letter-spacing: -0
 .demo-lines { position: absolute; inset: 0; width: 100%; height: 100%; }
 .demo-lines line { stroke: var(--slate); stroke-width: 2; }
 .demo-lines path { fill: var(--slate); }
-.card { position: absolute; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 0.8em; box-shadow: 0 4px 14px rgba(28, 33, 38, 0.1); font-size: 2.1cqw; color: #2a3747; }
+.card { position: absolute; background: var(--surface); border: 1px solid var(--line-strong); border-radius: 0.8em; box-shadow: 0 4px 14px rgba(28, 33, 38, 0.1); font-size: 2.1cqw; color: var(--ink); overflow: hidden; }
+/* Each card has a set size (not its text's), so the lines meet its edges at any width. */
+.card.colored { color: #2a3747; }
 /* The drawing scales as a whole (its text with it), so it reads the same on a phone. */
 .card header { font-weight: 700; padding: 0.6em 0.9em; border-bottom: 1px solid rgba(42, 55, 71, 0.15); }
 .card p { margin: 0.6em 0.9em; line-height: 1.4; }
 .card .muted { color: #5a7187; }
+.card header { border-bottom-color: var(--line); }
+.card.colored header { border-bottom-color: rgba(42, 55, 71, 0.15); }
 .tasks { list-style: none; margin: 0.6em 0.9em; padding: 0; display: grid; gap: 0.4em; }
 .tasks li { display: flex; align-items: center; gap: 0.55em; }
-.tasks i { width: 0.95em; height: 0.95em; border: 1.5px solid #5a7187; border-radius: 3px; flex: none; }
+.tasks i { width: 0.95em; height: 0.95em; border: 1.5px solid var(--slate); border-radius: 3px; flex: none; }
 .tasks .done { text-decoration: line-through; opacity: 0.65; }
 .tasks .done i { background: #237a50; border-color: #237a50; }
 
