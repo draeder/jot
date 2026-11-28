@@ -25,9 +25,9 @@
     "@tiptap/pm": "^3.35.0",
     "@tiptap/starter-kit": "^3.35.0",
     "@tiptap/vue-3": "^3.35.0",
-    "freertc": "github:draeder/freertc#ea9b989",
+    "freertc": "github:draeder/freertc#42f1172",
     "lowlight": "^3.3.0",
-    "peerpigeon": "https://codeload.github.com/PeerPigeon/PeerPigeon/tar.gz/5196a0fab8b9372c632b6dfc9ca64376076e271c",
+    "peerpigeon": "https://codeload.github.com/PeerPigeon/PeerPigeon/tar.gz/dc7bde39ccf79d39703298805c5033caebb1ca1b",
     "pigeonidp": "https://codeload.github.com/PeerPigeon/PigeonIdP/tar.gz/0932fe78bca815ace06aa5d7f39f8013c41fe126",
     "unsea": "https://codeload.github.com/draeder/unsea/tar.gz/3fff047dfb151838fc92a5d403de9351814aa9e0",
     "vue": "^3.5.22"
